@@ -49,7 +49,7 @@ func main() {
 
 					color.Green("✓ git clone craft-starter")
 
-					// ddev config --project-name=
+					// ddev config --project-name={projectName}
 					runCommand(exec.Command("ddev", "config", "--project-name="+projectName), false)
 					color.Green("✓ ddev config --project-name=" + projectName)
 
@@ -81,7 +81,7 @@ func main() {
 					runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false)
 					color.Green("✓ ddev import-db")
 
-					// rm -rf ./dirformynewrepo/.git
+					// rm -rf ./{projectName}/.git
 					runCommand(exec.Command("rm", "-rf", "./"+projectName+"/.git"), false)
 					color.Green("✓ rm -rf ./" + projectName + "/.git")
 
