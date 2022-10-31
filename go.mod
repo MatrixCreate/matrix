@@ -1,4 +1,4 @@
-module github.com/MatrixCreate/matrix-create-go-cli
+module github.com/MatrixCreate/matrix
 
 go 1.19
 
