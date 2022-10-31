@@ -122,17 +122,17 @@ func setupCraftCMS(fresh bool) {
 		color.Green("✓ ddev config --project-name=" + projectName)
 	}
 
-	// composer install
-	runCommand(exec.Command("composer", "install"), false)
-	color.Green("✓ composer install")
-
-	// npm install
-	runCommand(exec.Command("npm", "install"), false)
-	color.Green("✓ npm install")
-
 	// ddev start
 	runCommand(exec.Command("ddev", "start"), false)
 	color.Green("✓ ddev start")
+
+	// ddev composer install
+	runCommand(exec.Command("ddev", "composer", "install"), false)
+	color.Green("✓ ddev composer install")
+
+	// ddev npm install
+	runCommand(exec.Command("ddev", "npm", "install"), false)
+	color.Green("✓ ddev npm install")
 
 	// ddev craft setup/app-id
 	runCommand(exec.Command("ddev", "craft", "setup/app-id"), false)
