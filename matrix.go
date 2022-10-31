@@ -16,7 +16,7 @@ var projectName = ""
 func main() {
 	app := &cli.App{
 		Name:      "Matrix CLI",
-		Version:   "v1.0",
+		Version:   "v1.0.4",
 		Copyright: "(c) 2022 Matrix Create",
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
