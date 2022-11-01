@@ -1,22 +1,31 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 
 	"github.com/fatih/color"
+	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-var craftStarterRepo = "git@github.com:MatrixCreate/craft-starter.git"
-var projectName = ""
+var craftStarterRepo string = "git@github.com:MatrixCreate/craft-starter.git"
+var projectName string = ""
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	app := &cli.App{
 		Name:      "Matrix CLI",
-		Version:   "v1.0.4",
+		Version:   "v1.0.5",
 		Copyright: "(c) 2022 Matrix Create",
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
@@ -47,7 +56,7 @@ func main() {
 						return nil
 					}
 
-					color.Green("✓ git clone craft-starter")
+					color.Green("✓ git clone " + craftStarterRepo)
 
 					setupCraftCMS(true)
 
@@ -64,8 +73,9 @@ func main() {
 				Aliases: []string{"d"},
 				Usage:   "Deploy project from current directory",
 				Action: func(cCtx *cli.Context) error {
-					// TODO:
-					color.Red("TODO: Command not ready yet")
+					color.Red("This command is not finished yet! :(")
+
+					runRemoteCommand("ls -l")
 
 					return nil
 				},
@@ -82,10 +92,10 @@ func main() {
 						return nil
 					}
 
-					color.Magenta("Editing existing Craft CMS project: " + projectName)
+					color.Magenta("Setting up existing Craft CMS project to edit: " + projectName)
 
-					// git clone --depth=1 {craftStarterRepo} {projectName}
-					cmd := exec.Command("git", "clone", "--depth=1", "git@bitbucket.org:matrixcreate/"+projectName+".git", projectName)
+					// git clone git@bitbucket.org:matrixcreate/{projectName}.git {projectName}
+					cmd := exec.Command("git", "clone", "git@bitbucket.org:matrixcreate/"+projectName+".git", projectName)
 					cmdErr := cmd.Run()
 					if cmdErr != nil {
 						if cmdErr.Error() == "exit status 128" {
@@ -96,6 +106,8 @@ func main() {
 						color.Red("Error (git clone): " + cmdErr.Error())
 						return nil
 					}
+
+					color.Green("✓ git clone git@bitbucket.org:matrixcreate/" + projectName + ".git")
 
 					setupCraftCMS(false)
 
@@ -127,12 +139,20 @@ func setupCraftCMS(fresh bool) {
 	color.Green("✓ ddev start")
 
 	// ddev composer install
-	runCommand(exec.Command("ddev", "composer", "install"), false)
-	color.Green("✓ ddev composer install")
+	if fileExists("composer.lock") {
+		runCommand(exec.Command("ddev", "composer", "install"), false)
+		color.Green("✓ ddev composer install")
+	} else {
+		color.Green("- No composer.lock file found. Skipping composer install")
+	}
 
 	// ddev npm install
-	runCommand(exec.Command("ddev", "npm", "install"), false)
-	color.Green("✓ ddev npm install")
+	if fileExists("package-lock.json") {
+		runCommand(exec.Command("ddev", "npm", "install"), false)
+		color.Green("✓ ddev npm install")
+	} else {
+		color.Green("- No package-lock.json file found. Skipping npm install")
+	}
 
 	// ddev craft setup/app-id
 	runCommand(exec.Command("ddev", "craft", "setup/app-id"), false)
@@ -147,8 +167,12 @@ func setupCraftCMS(fresh bool) {
 	color.Green("✓ ddev craft setup/db")
 
 	// ddev import-db --src=_db/db.zip
-	runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false)
-	color.Green("✓ ddev import-db")
+	if fileExists("_db/db.zip") {
+		runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false)
+		color.Green("✓ ddev import-db")
+	} else {
+		color.Green("- No _db/db.zip file found. Skipping ddev import-db")
+	}
 
 	if fresh {
 		// rm -rf ./{projectName}/.git
@@ -175,5 +199,59 @@ func runCommand(cmd *exec.Cmd, showOutput bool) {
 		if err != nil {
 			color.Red("Error: " + err.Error())
 		}
+	}
+}
+
+func runRemoteCommand(command string) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		color.Red("Error: Unable to find home dir: %v", err)
+	}
+	key, err := os.ReadFile(homeDir + "/.ssh/id_rsa")
+	if err != nil {
+		color.Red("Error: Unable to read private key: %v", err)
+	}
+	signer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		color.Red("Error: Unable to parse private key: %v", err)
+	}
+	hostKeyCallback, err := knownhosts.New(homeDir + "/.ssh/known_hosts")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	config := &ssh.ClientConfig{
+		User: os.Getenv("REMOTE_SERVER_USER"),
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(signer),
+		},
+		HostKeyCallback: hostKeyCallback,
+	}
+	client, err := ssh.Dial("tcp", os.Getenv("REMOTE_SERVER_IP")+":22", config)
+	if err != nil {
+		log.Fatal("Failed to dial: ", err)
+	}
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		log.Fatal("Failed to create session: ", err)
+	}
+	defer session.Close()
+
+	var b bytes.Buffer
+	session.Stdout = &b
+	if err := session.Run(command); err != nil {
+		log.Fatal("Failed to run: " + err.Error())
+	}
+
+	color.White(b.String())
+}
+
+func fileExists(fileName string) bool {
+	if _, err := os.Stat("./" + projectName + "/" + fileName); err == nil {
+		return true
+	} else {
+		return false
 	}
 }
