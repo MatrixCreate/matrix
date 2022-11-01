@@ -18,14 +18,11 @@ var craftStarterRepo string = "git@github.com:MatrixCreate/craft-starter.git"
 var projectName string = ""
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	setupEnv()
 
 	app := &cli.App{
 		Name:      "Matrix CLI",
-		Version:   "v1.0.5",
+		Version:   "v1.0.6",
 		Copyright: "(c) 2022 Matrix Create",
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
@@ -127,6 +124,15 @@ func main() {
 	}
 }
 
+func setupEnv() {
+	if fileExists(".env") {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatal("Error loading .env file")
+		}
+	}
+}
+
 func setupCraftCMS(fresh bool) {
 	if fresh {
 		// ddev config --project-name={projectName}
@@ -139,7 +145,7 @@ func setupCraftCMS(fresh bool) {
 	color.Green("✓ ddev start")
 
 	// ddev composer install
-	if fileExists("composer.lock") {
+	if fileExists("./" + projectName + "/composer.lock") {
 		runCommand(exec.Command("ddev", "composer", "install"), false)
 		color.Green("✓ ddev composer install")
 	} else {
@@ -147,7 +153,7 @@ func setupCraftCMS(fresh bool) {
 	}
 
 	// ddev npm install
-	if fileExists("package-lock.json") {
+	if fileExists("./" + projectName + "/package-lock.json") {
 		runCommand(exec.Command("ddev", "npm", "install"), false)
 		color.Green("✓ ddev npm install")
 	} else {
@@ -167,7 +173,7 @@ func setupCraftCMS(fresh bool) {
 	color.Green("✓ ddev craft setup/db")
 
 	// ddev import-db --src=_db/db.zip
-	if fileExists("_db/db.zip") {
+	if fileExists("./" + projectName + "/_db/db.zip") {
 		runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false)
 		color.Green("✓ ddev import-db")
 	} else {
@@ -249,7 +255,7 @@ func runRemoteCommand(command string) {
 }
 
 func fileExists(fileName string) bool {
-	if _, err := os.Stat("./" + projectName + "/" + fileName); err == nil {
+	if _, err := os.Stat(fileName); err == nil {
 		return true
 	} else {
 		return false
