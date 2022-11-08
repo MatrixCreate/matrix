@@ -38,27 +38,14 @@ func main() {
 						return nil
 					}
 
-					color.Magenta("Creating new Craft CMS project: " + projectName)
-
-					// git clone --depth=1 {craftStarterRepo} {projectName}
-					cmd := exec.Command("git", "clone", "--depth=1", craftStarterRepo, projectName)
-					cmdErr := cmd.Run()
-					if cmdErr != nil {
-						if cmdErr.Error() == "exit status 128" {
-							color.Red("Project already exists")
-							return nil
-						}
-
-						color.Red("Error (git clone): " + cmdErr.Error())
-						return nil
+					if fileExists(projectName) {
+						color.Red("Project directory already exists")
+						os.Exit(0)
 					}
 
-					color.Green("✓ git clone " + craftStarterRepo)
+					color.Magenta("Creating new Craft CMS project: " + projectName)
 
 					setupCraftCMS(true)
-
-					// ddev describe
-					runCommand(exec.Command("ddev", "describe"), true)
 
 					color.Magenta("Project Ready! /" + projectName)
 
@@ -70,7 +57,7 @@ func main() {
 				Aliases: []string{"d"},
 				Usage:   "Deploy project from current directory",
 				Action: func(cCtx *cli.Context) error {
-					color.Red("This command is not finished yet! :(")
+					color.Red("This command is not finished yet!")
 
 					runRemoteCommand("ls -l")
 
@@ -91,25 +78,7 @@ func main() {
 
 					color.Magenta("Setting up existing Craft CMS project to edit: " + projectName)
 
-					// git clone git@bitbucket.org:matrixcreate/{projectName}.git {projectName}
-					cmd := exec.Command("git", "clone", "git@bitbucket.org:matrixcreate/"+projectName+".git", projectName)
-					cmdErr := cmd.Run()
-					if cmdErr != nil {
-						if cmdErr.Error() == "exit status 128" {
-							color.Red("Project already exists")
-							return nil
-						}
-
-						color.Red("Error (git clone): " + cmdErr.Error())
-						return nil
-					}
-
-					color.Green("✓ git clone git@bitbucket.org:matrixcreate/" + projectName + ".git")
-
 					setupCraftCMS(false)
-
-					// ddev describe
-					runCommand(exec.Command("ddev", "describe"), true)
 
 					color.Magenta("Project Ready! /" + projectName)
 
@@ -135,18 +104,26 @@ func setupEnv() {
 
 func setupCraftCMS(fresh bool) {
 	if fresh {
+		// git clone --depth=1 {craftStarterRepo} {projectName}
+		runCommand(exec.Command("git", "clone", "--depth=1", craftStarterRepo, projectName), false, false)
+		color.Green("✓ git clone " + craftStarterRepo)
+
 		// ddev config --project-name={projectName}
-		runCommand(exec.Command("ddev", "config", "--project-name="+projectName), false)
+		runCommand(exec.Command("ddev", "config", "--project-name="+projectName), false, true)
 		color.Green("✓ ddev config --project-name=" + projectName)
+	} else {
+		// git clone -b develop git@bitbucket.org:matrixcreate/{projectName}.git {projectName}
+		runCommand(exec.Command("git", "clone", "-b", "develop", "git@bitbucket.org:matrixcreate/"+projectName+".git", projectName), false, false)
+		color.Green("✓ git clone git@bitbucket.org:matrixcreate/" + projectName + ".git")
 	}
 
 	// ddev start
-	runCommand(exec.Command("ddev", "start"), false)
+	runCommand(exec.Command("ddev", "start"), false, true)
 	color.Green("✓ ddev start")
 
 	// ddev composer install
 	if fileExists("./" + projectName + "/composer.lock") {
-		runCommand(exec.Command("ddev", "composer", "install"), false)
+		runCommand(exec.Command("ddev", "composer", "install"), false, true)
 		color.Green("✓ ddev composer install")
 	} else {
 		color.Green("- No composer.lock file found. Skipping composer install")
@@ -154,27 +131,27 @@ func setupCraftCMS(fresh bool) {
 
 	// ddev npm install
 	if fileExists("./" + projectName + "/package-lock.json") {
-		runCommand(exec.Command("ddev", "npm", "install"), false)
+		runCommand(exec.Command("ddev", "npm", "install"), false, true)
 		color.Green("✓ ddev npm install")
 	} else {
 		color.Green("- No package-lock.json file found. Skipping npm install")
 	}
 
-	// ddev craft setup/app-id
-	runCommand(exec.Command("ddev", "craft", "setup/app-id"), false)
+	// ddev craft setup/app-id --interactive=0
+	runCommand(exec.Command("ddev", "craft", "setup/app-id", "--interactive=0"), false, true)
 	color.Green("✓ ddev craft setup/app-id")
 
 	// ddev craft setup/security-key
-	runCommand(exec.Command("ddev", "craft", "setup/security-key"), false)
+	runCommand(exec.Command("ddev", "craft", "setup/security-key"), false, true)
 	color.Green("✓ ddev craft setup/security-key")
 
 	// ddev craft setup/db --interactive=0 --driver=mysql --database=db --password=db --user=db --server=ddev-{projectName}-db --port=3306
-	runCommand(exec.Command("ddev", "craft", "setup/db", "--interactive=0", "--driver=mysql", "--database=db", "--password=db", "--user=db", "--server=ddev-"+projectName+"-db", "--port=3306"), false)
+	runCommand(exec.Command("ddev", "craft", "setup/db", "--interactive=0", "--driver=mysql", "--database=db", "--password=db", "--user=db", "--server=ddev-"+projectName+"-db", "--port=3306"), false, true)
 	color.Green("✓ ddev craft setup/db")
 
 	// ddev import-db --src=_db/db.zip
 	if fileExists("./" + projectName + "/_db/db.zip") {
-		runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false)
+		runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false, true)
 		color.Green("✓ ddev import-db")
 	} else {
 		color.Green("- No _db/db.zip file found. Skipping ddev import-db")
@@ -182,28 +159,37 @@ func setupCraftCMS(fresh bool) {
 
 	if fresh {
 		// rm -rf ./{projectName}/.git
-		runCommand(exec.Command("rm", "-rf", "./"+projectName+"/.git"), false)
+		runCommand(exec.Command("rm", "-rf", "./"+projectName+"/.git"), false, true)
 		color.Green("✓ rm -rf ./" + projectName + "/.git")
 
 		// git init
-		runCommand(exec.Command("git", "init"), false)
+		runCommand(exec.Command("git", "init"), false, true)
 		color.Green("✓ git init")
 	}
+
+	// ddev describe
+	runCommand(exec.Command("ddev", "describe"), true, true)
 }
 
-func runCommand(cmd *exec.Cmd, showOutput bool) {
-	cmd.Dir = "./" + projectName
+func runCommand(cmd *exec.Cmd, showOutput bool, inProject bool) {
+	if inProject {
+		cmd.Dir = "./" + projectName
+	}
 
 	if showOutput {
 		out, err := cmd.Output()
 		if err != nil {
+			color.Red("Error Running: " + cmd.String())
 			color.Red("Error: " + err.Error())
+			os.Exit(0)
 		}
 		fmt.Println(string(out))
 	} else {
 		err := cmd.Run()
 		if err != nil {
+			color.Red("Error Running: " + cmd.String())
 			color.Red("Error: " + err.Error())
+			os.Exit(0)
 		}
 	}
 }
