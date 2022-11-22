@@ -31,7 +31,16 @@ func main() {
 				Name:    "create",
 				Aliases: []string{"c"},
 				Usage:   "Create a new Craft CMS project",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "valet",
+						Aliases: []string{"v"},
+						Usage:   "Edit using Valet instead of DDEV",
+					},
+				},
 				Action: func(cCtx *cli.Context) error {
+					var valetMode = cCtx.Bool("valet")
+
 					projectName = cCtx.Args().First()
 
 					if projectName == "" {
@@ -46,7 +55,7 @@ func main() {
 
 					color.Magenta("Creating new Craft CMS project: " + projectName)
 
-					setupProject(true, false)
+					setupProject(true, false, valetMode)
 
 					color.Magenta("Project Ready! cd " + projectName)
 
@@ -75,11 +84,15 @@ func main() {
 						Aliases: []string{"s"},
 						Usage:   "Edit in shallow mode which provides a low depth git clone with all branches",
 					},
+					&cli.BoolFlag{
+						Name:    "valet",
+						Aliases: []string{"v"},
+						Usage:   "Edit using Valet instead of DDEV",
+					},
 				},
 				Action: func(cCtx *cli.Context) error {
 					var shallowMode = cCtx.Bool("shallow")
-
-					log.Fatal(shallowMode)
+					var valetMode = cCtx.Bool("valet")
 
 					projectName = cCtx.Args().First()
 
@@ -95,7 +108,7 @@ func main() {
 
 					color.Magenta("Setting up existing project to edit: " + projectName)
 
-					setupProject(false, shallowMode)
+					setupProject(false, shallowMode, valetMode)
 
 					color.Magenta("Project Ready! cd " + projectName)
 
@@ -119,7 +132,7 @@ func setupEnv() {
 	}
 }
 
-func setupProject(freshMode bool, shallowMode bool) {
+func setupProject(freshMode bool, shallowMode bool, valetMode bool) {
 	if freshMode {
 		// git clone --depth=1 {craftStarterRepo} {projectName}
 		runCommand(exec.Command("git", "clone", "--depth=1", craftStarterRepo, projectName), false, false, true)
@@ -140,58 +153,109 @@ func setupProject(freshMode bool, shallowMode bool) {
 		}
 	}
 
-	// ddev start
-	runCommand(exec.Command("ddev", "start"), false, true, true)
-	color.Green("✓ ddev start")
+	if valetMode {
+		// valet link
+		runCommand(exec.Command("valet", "link"), false, true, true)
+		color.Green("✓ valet link")
 
-	// ddev composer install
-	if fileExists(projectName + "/composer.lock") {
-		runCommand(exec.Command("ddev", "composer", "install"), false, true, false)
-		color.Green("✓ ddev composer install")
+		// composer install
+		if fileExists(projectName + "/composer.lock") {
+			runCommand(exec.Command("composer", "install"), false, true, false)
+			color.Green("✓ composer install")
+		} else {
+			color.Yellow("- No composer.lock file found. Skipping composer install")
+		}
+
+		// npm install
+		if fileExists(projectName + "/package-lock.json") {
+			runCommand(exec.Command("npm", "install"), false, true, false)
+			color.Green("✓ npm install")
+		} else {
+			color.Yellow("- No package-lock.json file found. Skipping npm install")
+		}
+
+		if fileExists(projectName + "/craft") {
+			// php craft setup/app-id --interactive=0
+			runCommand(exec.Command("php", "craft", "setup/app-id", "--interactive=0"), false, true, false)
+			color.Green("✓ php craft setup/app-id")
+
+			// php craft setup/security-key
+			runCommand(exec.Command("php", "craft", "setup/security-key"), false, true, false)
+			color.Green("✓ php craft setup/security-key")
+
+			// php craft setup/db --interactive=0 --driver=mysql --database=db --password=db --user=db --server=ddev-{projectName}-db --port=3306
+			runCommand(exec.Command("php", "craft", "setup/db", "--interactive=0", "--driver=mysql", "--database=db", "--password=db", "--user=db", "--server=ddev-"+projectName+"-db", "--port=3306"), false, true, false)
+			color.Green("✓ php craft setup/db --driver=mysql --database=db --password=db --user=db --server=ddev-" + projectName + "-db --port=3306")
+		}
+
+		// ddev import-db --src=_db/db.zip
+		// TODO: Add Valet version for DB settings using DBngin
+
+		if freshMode {
+			// rm -rf ./{projectName}/.git
+			runCommand(exec.Command("rm", "-rf", "./"+projectName+"/.git"), false, true, false)
+			color.Green("✓ rm -rf ./" + projectName + "/.git")
+
+			// git init
+			runCommand(exec.Command("git", "init"), false, true, false)
+			color.Green("✓ git init")
+		}
 	} else {
-		color.Yellow("- No composer.lock file found. Skipping composer install")
+		// ddev start
+		runCommand(exec.Command("ddev", "start"), false, true, true)
+		color.Green("✓ ddev start")
+
+		// ddev composer install
+		if fileExists(projectName + "/composer.lock") {
+			runCommand(exec.Command("ddev", "composer", "install"), false, true, false)
+			color.Green("✓ ddev composer install")
+		} else {
+			color.Yellow("- No composer.lock file found. Skipping composer install")
+		}
+
+		// ddev npm install
+		if fileExists(projectName + "/package-lock.json") {
+			runCommand(exec.Command("ddev", "npm", "install"), false, true, false)
+			color.Green("✓ ddev npm install")
+		} else {
+			color.Yellow("- No package-lock.json file found. Skipping npm install")
+		}
+
+		if fileExists(projectName + "/craft") {
+			// ddev craft setup/app-id --interactive=0
+			runCommand(exec.Command("ddev", "craft", "setup/app-id", "--interactive=0"), false, true, false)
+			color.Green("✓ ddev craft setup/app-id")
+
+			// ddev craft setup/security-key
+			runCommand(exec.Command("ddev", "craft", "setup/security-key"), false, true, false)
+			color.Green("✓ ddev craft setup/security-key")
+
+			// ddev craft setup/db --interactive=0 --driver=mysql --database=db --password=db --user=db --server=ddev-{projectName}-db --port=3306
+			runCommand(exec.Command("ddev", "craft", "setup/db", "--interactive=0", "--driver=mysql", "--database=db", "--password=db", "--user=db", "--server=ddev-"+projectName+"-db", "--port=3306"), false, true, false)
+			color.Green("✓ ddev craft setup/db --driver=mysql --database=db --password=db --user=db --server=ddev-" + projectName + "-db --port=3306")
+		}
+
+		// ddev import-db --src=_db/db.zip
+		if fileExists("./" + projectName + "/_db/db.zip") {
+			runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false, true, false)
+			color.Green("✓ ddev import-db --src=_db/db.zip")
+		} else {
+			color.Yellow("- No _db/db.zip file found. Skipping ddev import-db")
+		}
+
+		if freshMode {
+			// rm -rf ./{projectName}/.git
+			runCommand(exec.Command("rm", "-rf", "./"+projectName+"/.git"), false, true, false)
+			color.Green("✓ rm -rf ./" + projectName + "/.git")
+
+			// git init
+			runCommand(exec.Command("git", "init"), false, true, false)
+			color.Green("✓ git init")
+		}
+
+		// ddev describe
+		runCommand(exec.Command("ddev", "describe"), true, true, false)
 	}
-
-	// ddev npm install
-	if fileExists(projectName + "/package-lock.json") {
-		runCommand(exec.Command("ddev", "npm", "install"), false, true, false)
-		color.Green("✓ ddev npm install")
-	} else {
-		color.Yellow("- No package-lock.json file found. Skipping npm install")
-	}
-
-	// ddev craft setup/app-id --interactive=0
-	runCommand(exec.Command("ddev", "craft", "setup/app-id", "--interactive=0"), false, true, false)
-	color.Green("✓ ddev craft setup/app-id")
-
-	// ddev craft setup/security-key
-	runCommand(exec.Command("ddev", "craft", "setup/security-key"), false, true, false)
-	color.Green("✓ ddev craft setup/security-key")
-
-	// ddev craft setup/db --interactive=0 --driver=mysql --database=db --password=db --user=db --server=ddev-{projectName}-db --port=3306
-	runCommand(exec.Command("ddev", "craft", "setup/db", "--interactive=0", "--driver=mysql", "--database=db", "--password=db", "--user=db", "--server=ddev-"+projectName+"-db", "--port=3306"), false, true, false)
-	color.Green("✓ ddev craft setup/db --driver=mysql --database=db --password=db --user=db --server=ddev-" + projectName + "-db --port=3306")
-
-	// ddev import-db --src=_db/db.zip
-	if fileExists("./" + projectName + "/_db/db.zip") {
-		runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false, true, false)
-		color.Green("✓ ddev import-db --src=_db/db.zip")
-	} else {
-		color.Yellow("- No _db/db.zip file found. Skipping ddev import-db")
-	}
-
-	if freshMode {
-		// rm -rf ./{projectName}/.git
-		runCommand(exec.Command("rm", "-rf", "./"+projectName+"/.git"), false, true, false)
-		color.Green("✓ rm -rf ./" + projectName + "/.git")
-
-		// git init
-		runCommand(exec.Command("git", "init"), false, true, false)
-		color.Green("✓ git init")
-	}
-
-	// ddev describe
-	runCommand(exec.Command("ddev", "describe"), true, true, false)
 }
 
 func runCommand(cmd *exec.Cmd, showOutput bool, inProject bool, exitOnError bool) {
