@@ -46,7 +46,7 @@ func main() {
 
 					color.Magenta("Creating new Craft CMS project: " + projectName)
 
-					setupProject(true)
+					setupProject(true, false)
 
 					color.Magenta("Project Ready! cd " + projectName)
 
@@ -69,7 +69,18 @@ func main() {
 				Name:    "edit",
 				Aliases: []string{"e"},
 				Usage:   "Clone and setup an existing project to edit",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "shallow",
+						Aliases: []string{"s"},
+						Usage:   "Edit in shallow mode which provides a low depth git clone with all branches",
+					},
+				},
 				Action: func(cCtx *cli.Context) error {
+					var shallowMode = cCtx.Bool("shallow")
+
+					log.Fatal(shallowMode)
+
 					projectName = cCtx.Args().First()
 
 					if projectName == "" {
@@ -84,7 +95,7 @@ func main() {
 
 					color.Magenta("Setting up existing project to edit: " + projectName)
 
-					setupProject(false)
+					setupProject(false, shallowMode)
 
 					color.Magenta("Project Ready! cd " + projectName)
 
@@ -108,8 +119,8 @@ func setupEnv() {
 	}
 }
 
-func setupProject(fresh bool) {
-	if fresh {
+func setupProject(freshMode bool, shallowMode bool) {
+	if freshMode {
 		// git clone --depth=1 {craftStarterRepo} {projectName}
 		runCommand(exec.Command("git", "clone", "--depth=1", craftStarterRepo, projectName), false, false, true)
 		color.Green("✓ git clone --depth=1 " + craftStarterRepo + " " + projectName)
@@ -118,9 +129,15 @@ func setupProject(fresh bool) {
 		runCommand(exec.Command("ddev", "config", "--project-name="+projectName), false, true, false)
 		color.Green("✓ ddev config --project-name=" + projectName)
 	} else {
-		// git clone -b develop git@bitbucket.org:matrixcreate/{projectName}.git {projectName}
-		runCommand(exec.Command("git", "clone", "-b", "develop", "git@bitbucket.org:matrixcreate/"+projectName+".git", projectName), false, false, true)
-		color.Green("✓ git clone -b develop git@bitbucket.org:matrixcreate/" + projectName + ".git" + " " + projectName)
+		if shallowMode {
+			// git clone --depth=1 --no-single-branch -b develop git@bitbucket.org:matrixcreate/{projectName}.git {projectName}
+			runCommand(exec.Command("git", "clone", "--depth=1", "--no-single-branch", "-b", "develop", "git@bitbucket.org:matrixcreate/"+projectName+".git", projectName), false, false, true)
+			color.Green("✓ git clone --depth=1 --no-single-branch -b develop git@bitbucket.org:matrixcreate/" + projectName + ".git" + " " + projectName)
+		} else {
+			// git clone -b develop git@bitbucket.org:matrixcreate/{projectName}.git {projectName}
+			runCommand(exec.Command("git", "clone", "-b", "develop", "git@bitbucket.org:matrixcreate/"+projectName+".git", projectName), false, false, true)
+			color.Green("✓ git clone -b develop git@bitbucket.org:matrixcreate/" + projectName + ".git" + " " + projectName)
+		}
 	}
 
 	// ddev start
@@ -163,7 +180,7 @@ func setupProject(fresh bool) {
 		color.Yellow("- No _db/db.zip file found. Skipping ddev import-db")
 	}
 
-	if fresh {
+	if freshMode {
 		// rm -rf ./{projectName}/.git
 		runCommand(exec.Command("rm", "-rf", "./"+projectName+"/.git"), false, true, false)
 		color.Green("✓ rm -rf ./" + projectName + "/.git")
