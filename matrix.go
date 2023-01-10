@@ -24,7 +24,7 @@ func main() {
 	app := &cli.App{
 		Name:      "Matrix CLI",
 		Version:   "v1.2.0",
-		Copyright: "(c) 2022 Matrix Create",
+		Copyright: "(c) 2023 Matrix Create",
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
 			{
