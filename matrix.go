@@ -1,17 +1,16 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 	"github.com/joho/godotenv"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 var craftStarterRepo string = "git@github.com:MatrixCreate/craft-starter.git"
@@ -23,7 +22,7 @@ func main() {
 
 	app := &cli.App{
 		Name:      "Matrix CLI",
-		Version:   "v1.2.0",
+		Version:   "v1.2.1",
 		Copyright: "(c) 2023 Matrix Create",
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
@@ -272,91 +271,51 @@ func setupProject(freshMode bool, shallowMode bool, valetMode bool) {
 }
 
 func runCommand(cmd *exec.Cmd, showOutput bool, inProject bool, exitOnError bool) {
+	s := spinner.New(spinner.CharSets[25], 100*time.Millisecond)
+	s.Start()
+
 	if inProject {
 		cmd.Dir = "./" + projectName
 	}
 
-	fmt.Println("Running: " + cmd.String())
+	color.White("Running: " + cmd.String())
 
 	if showOutput {
 		out, err := cmd.Output()
 		if err != nil {
+			s.Stop()
+
 			if exitOnError {
 				color.Red("× Error Running: " + cmd.String())
-				color.Red(err.Error())
+				color.Red("× " + err.Error())
 				os.Exit(commandCount)
 			} else {
 				color.Yellow("× Error Running: " + cmd.String())
-				color.Yellow(err.Error())
+				color.Yellow("× " + err.Error())
 			}
 		}
 		fmt.Println(string(out))
 	} else {
 		err := cmd.Run()
 		if err != nil {
+			s.Stop()
+
 			if exitOnError {
 				color.Red("× Error Running: " + cmd.String())
-				color.Red(err.Error())
+				color.Red("× " + err.Error())
+				color.White("Tip: Run the above command seperately for more info to find out what went wrong")
 				os.Exit(commandCount)
 			} else {
 				color.Yellow("× Error Running: " + cmd.String())
 				color.Yellow(err.Error())
 			}
 		} else {
+			s.Stop()
 			color.Green("✓ Completed: " + cmd.String())
 		}
 	}
 
 	commandCount++
-}
-
-func runRemoteCommand(command string) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		color.Red("× Error: Unable to find home dir: %v", err)
-		os.Exit(1)
-	}
-	key, err := os.ReadFile(homeDir + "/.ssh/id_rsa")
-	if err != nil {
-		color.Red("× Error: Unable to read private key: %v", err)
-		os.Exit(2)
-	}
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		color.Red("× Error: Unable to parse private key: %v", err)
-		os.Exit(3)
-	}
-	hostKeyCallback, err := knownhosts.New(homeDir + "/.ssh/known_hosts")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	config := &ssh.ClientConfig{
-		User: os.Getenv("REMOTE_SERVER_USER"),
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
-		HostKeyCallback: hostKeyCallback,
-	}
-	client, err := ssh.Dial("tcp", os.Getenv("REMOTE_SERVER_IP")+":22", config)
-	if err != nil {
-		log.Fatal("× Failed to dial: ", err)
-	}
-	defer client.Close()
-
-	session, err := client.NewSession()
-	if err != nil {
-		log.Fatal("× Failed to create session: ", err)
-	}
-	defer session.Close()
-
-	var b bytes.Buffer
-	session.Stdout = &b
-	if err := session.Run(command); err != nil {
-		log.Fatal("× Failed to run: " + err.Error())
-	}
-
-	color.White(b.String())
 }
 
 func fileExists(fileName string) bool {
