@@ -199,34 +199,38 @@ func main() {
 					var blueprintID string = "lamp_8_bitnami"
 					var profileName string = "matrix"
 
-					projectName = cCtx.Args().First()
-
-					if projectName == "" {
-						color.Red("× Error: Missing project name")
-						os.Exit(1)
-					}
-
 					// Check if project is craft
-					if fileExists("/craft") {
+					if fileExists("craft") {
 						projectType = "craft"
 					}
 
 					// Check if project is wordpress
-					if fileExists("/wp-content") {
+					if fileExists("wp-content") {
 						projectType = "wordpress"
 					}
+
+					// Run gh auth token to get github token and store in variable
+					cmd := exec.Command("gh", "auth", "token")
+					out, err := cmd.Output()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.Red("× " + err.Error())
+						os.Exit(1)
+					}
+					githubToken := string(out)
 
 					// Create deploy script
 					data :=	"#!/bin/bash\n"
 
 					if projectType == "craft" {
 						data += "cd /home/bitnami/htdocs\n"
-						// TODO: finish deploy script
+
+						// TODO: finish Craft deploy script
 					}
 
 					if projectType == "wordpress" {
 						data += "cd /home/bitnami/wordpress\n"
-						// TODO: finish deploy script
+						// TODO: finish Wordpress deploy script
 					}
 
 					// If deploy.sh script already exists then make a copy and delete it
@@ -246,6 +250,9 @@ func main() {
 					}
 					
 					color.Green("✓ Completed: Writing to: deploy.sh")
+
+					// Stop to debug
+					os.Exit(1)
 
 					// Deploy a lightsail instance using the git repo from the current directory
 					cmd := exec.Command("aws", "lightsail", "create-instances", "--instance-names", projectName, "--availability-zone", "eu-west-2a", "--blueprint-id", blueprintID, "--bundle-id", "nano_3_0", "--user-data", "file://deploy.sh", "--profile", profileName)
