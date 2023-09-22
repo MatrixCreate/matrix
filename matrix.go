@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"time"
+	"strings"
 
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
@@ -199,6 +200,14 @@ func main() {
 					var blueprintID string = "lamp_8_bitnami"
 					var profileName string = "matrix"
 
+					// Get project name
+					projectName = cCtx.Args().First()
+
+					if projectName == "" {
+						color.Red("× Error: Missing project name")
+						os.Exit(1)
+					}
+
 					// Check if project is craft
 					if fileExists("craft") {
 						projectType = "craft"
@@ -219,20 +228,99 @@ func main() {
 					}
 					githubToken := string(out)
 
-					// Create deploy script
+					// Get current git remote url
+					cmd = exec.Command("git", "config", "--get", "remote.origin.url")
+					out, err = cmd.Output()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.Red("× " + err.Error())
+						os.Exit(1)
+					}
+					gitRemoteUrl := string(out)
+
+					// Convert git remote URL to HTTPS
+					if string(out[0:3]) == "git" {
+						gitRemoteUrl = "https://" + string(out[4:len(out)-5])
+
+						// github.com: should be github.com/
+						gitRemoteUrl = strings.Replace(gitRemoteUrl, "github.com:", "github.com/", 1)
+					}
+
+					// Get current github username
+					cmd = exec.Command("gh", "api", "user")
+					out, err = cmd.Output()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.Red("× " + err.Error())
+						os.Exit(1)
+					}
+					githubUsernameJson := string(out)
+
+					// Get github username from JSON
+					githubUsername := strings.Split(githubUsernameJson, "\"")[3]
+
+					color.White("Git Username: " + githubUsername)
+					color.White("Git Remote URL: " + gitRemoteUrl)
+					color.White("Git Token: " + githubToken)
+
+					// Add username:token to git remote URL
+					gitRemoteUrl = strings.Replace(gitRemoteUrl, "https://", "https://"+githubUsername+":"+githubToken+"@", 1)
+
+					// Remove new line
+					gitRemoteUrl = strings.Replace(gitRemoteUrl, "\n", "", 1)
+
+					color.White("Git Remote URL: " + gitRemoteUrl)
+
+					// Start creating deploy script
 					data :=	"#!/bin/bash\n"
+					
+					// cd to htdocs directory
+					data += "cd /home/bitnami/htdocs\n"
+
+					// Remove index.html
+					data += "rm index.html\n"
 
 					if projectType == "craft" {
-						data += "cd /home/bitnami/htdocs\n"
-
-						// TODO: finish Craft deploy script
+						// Edit /opt/bitnami/apache/conf/bitnami/bitnami.conf and change /home/bitnami/htdocs to /home/bitnami/htdocs/web and save
+						data += "sed -i 's/\\/home\\/bitnami\\/htdocs/\\/home\\/bitnami\\/htdocs\\/web/g' /opt/bitnami/apache/conf/bitnami/bitnami.conf\n"
+					
+						// Restart Apache
+						data += "sudo /opt/bitnami/ctlscript.sh restart apache\n"
 					}
 
-					if projectType == "wordpress" {
-						data += "cd /home/bitnami/wordpress\n"
-						// TODO: finish Wordpress deploy script
-					}
+					// git clone repo into current directory
+					data += "git clone " + gitRemoteUrl + " .\n"
 
+					// chown -R bitnami:daemon /home/bitnami/htdocs
+					data += "chown -R bitnami:daemon /home/bitnami/htdocs/\n"
+
+					// if composer file exists on the instance then run composer install
+					data += "if [ -f \"composer.json\" ]; then\n"
+					data += "composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader\n"
+					data += "fi\n"
+
+					// if package.json file exists on the instance then run npm install
+					data += "if [ -f \"package.json\" ]; then\n"
+					data += "npm install\n"
+					data += "fi\n"
+
+					// if craft file exists on the instance then run craft setup commands
+					if projectType == "craft" {
+						// php craft setup/app-id --interactive=0
+						data += "php craft setup/app-id --interactive=0\n"
+
+						// php craft setup/security-key
+						data += "php craft setup/security-key\n"
+					}
+					
+					// TODO: Database setup and migrations etc...
+
+					// Install Go
+					data += "sudo apt -y install golang-go\n"
+
+					// Install Matrix CLI
+					data += "go install github.com/MatrixCreate/matrix@latest\n"
+					
 					// If deploy.sh script already exists then make a copy and delete it
 					if fileExists("deploy.sh") {
 						runCommand(exec.Command("mv", "deploy.sh", "deploy.sh.old"), false, false, true)
@@ -251,13 +339,10 @@ func main() {
 					
 					color.Green("✓ Completed: Writing to: deploy.sh")
 
-					// Stop to debug
-					os.Exit(1)
-
 					// Deploy a lightsail instance using the git repo from the current directory
-					cmd := exec.Command("aws", "lightsail", "create-instances", "--instance-names", projectName, "--availability-zone", "eu-west-2a", "--blueprint-id", blueprintID, "--bundle-id", "nano_3_0", "--user-data", "file://deploy.sh", "--profile", profileName)
+					cmd = exec.Command("aws", "lightsail", "create-instances", "--instance-names", projectName, "--availability-zone", "eu-west-2a", "--blueprint-id", blueprintID, "--bundle-id", "nano_3_0", "--user-data", "file://deploy.sh", "--profile", profileName)
 
-					out, err := cmd.Output()
+					out, err = cmd.Output()
 					if err != nil {
 						color.Red("× Error Running: " + cmd.String())
 						color.Red("× " + err.Error())
@@ -265,10 +350,67 @@ func main() {
 					}
 					fmt.Println(string(out))
 
-					color.Green("✓ Completed: Deploying project to AWS Lightsail")
-
 					// Delete deploy.sh file
 					runCommand(exec.Command("rm", "deploy.sh"), false, false, true)
+
+					color.Green("✓ Completed: Deploying project to AWS Lightsail")
+
+					color.Magenta("--------------------------------------------------")
+					color.Magenta("🎉            DEPLOYMENT STARTED                🎉")
+					color.Magenta("--------------------------------------------------")
+
+					// Check if instance is running and wait until it is
+					color.Magenta("Checking if instance is running")
+
+					cmd = exec.Command("aws", "lightsail", "get-instance-state", "--instance-name", projectName, "--profile", profileName)
+
+					out, err = cmd.Output()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.Red("× " + err.Error())
+						os.Exit(1)
+					}
+					fmt.Println(string(out))
+
+					// Wait until instance is running
+					for strings.Contains(string(out), "pending") {
+						color.Magenta("Waiting for instance to start")
+
+						cmd = exec.Command("aws", "lightsail", "get-instance-state", "--instance-name", projectName, "--profile", profileName)
+
+						out, err = cmd.Output()
+						if err != nil {
+							color.Red("× Error Running: " + cmd.String())
+							color.Red("× " + err.Error())
+							os.Exit(1)
+						}
+						fmt.Println(string(out))
+
+						time.Sleep(5 * time.Second)
+					}
+
+					color.Green("✓ Completed: Instance is running")
+
+					color.Magenta("--------------------------------------------------")
+					color.Magenta("🎉            DEPLOYMENT COMPLETE               🎉")
+					color.Magenta("--------------------------------------------------")
+
+					// Get IP of the new instance as a var
+					cmd = exec.Command("aws", "lightsail", "get-instance", "--instance-name", projectName, "--profile", profileName)
+
+					out, err = cmd.Output()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.Red("× " + err.Error())
+						os.Exit(1)
+					}
+
+					// Get ['instance']['publicIpAddress'] from JSON and not anything after
+					instancePublicIpAddress := strings.Split(string(out), "\"publicIpAddress\": \"")[1]
+					instancePublicIpAddress = strings.Split(instancePublicIpAddress, "\"")[0]
+
+					// Print IP
+					color.White("http://" + instancePublicIpAddress)
 
 					return nil
 				},
