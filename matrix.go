@@ -15,17 +15,71 @@ import (
 
 var craftStarterRepo string = "git@github.com:MatrixCreate/craft-starter.git"
 var projectName string = ""
+var projectType string = "unknown"
 var commandCount int = 0
+var s *spinner.Spinner = spinner.New(spinner.CharSets[25], 100*time.Millisecond)
 
 func main() {
-	setupEnv()
-
 	app := &cli.App{
 		Name:      "Matrix CLI",
-		Version:   "v1.2.1",
+		Authors: []*cli.Author{
+			{
+				Name:  "Adam Glaysher",
+				Email: "adam@matrixcreate.com",
+			},
+			{
+				Name:  "Jamie Adams",
+				Email: "jamie@matrixcreate.com",
+			},
+		},
+		Version:   "v2.0.0",
 		Copyright: "(c) 2023 Matrix Create",
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
+			{
+				Name:   "status",
+				Aliases: []string{"s"},
+				Usage:  "Show status of Matrix CLI",
+				Action: func(cCtx *cli.Context) error {
+					color.Magenta("Matrix CLI Status")
+
+					// Check if Git is installed
+					runCommand(exec.Command("git", "--version"), true, false, false)
+
+					color.Green("✓ Git is installed")
+
+					// Check if DDEV is installed
+					runCommand(exec.Command("ddev", "--version"), true, false, false)
+
+					color.Green("✓ DDEV is installed")
+
+					// Check if Github CLI (gh) is installed and authed
+					runCommand(exec.Command("gh", "auth", "status"), true, false, false)
+
+					color.Green("✓ GitHub CLI installed and authed")
+
+					// Check if AWS CLI (aws) is installed and authed
+					runCommand(exec.Command("aws", "--version"), true, false, false)
+
+					color.Green("✓ AWS CLI installed and authed")
+
+					color.Green("✓ Completed: Matrix CLI Status")
+
+					return nil
+				},
+			},
+			{
+				Name:   "configure",
+				Aliases: []string{"c", "config"},
+				Usage:  "Configure Matrix CLI with AWS IAM Identity Center and Github CLI",
+				Action: func(cCtx *cli.Context) error {
+					configureMatrix()
+					configureAWS()
+					configureGithub()
+
+					return nil
+				},
+			},
 			{
 				Name:    "create",
 				Aliases: []string{"c"},
@@ -135,6 +189,158 @@ func main() {
 				},
 			},
 			{
+				Name:    "deploy",
+				Aliases: []string{"d"},
+				Usage:   "Deploy project to AWS Lightsail",
+				Action: func(cCtx *cli.Context) error {
+					// Deploy a lightsail instance using the git repo from the current directory
+					color.Magenta("Deploying project to AWS Lightsail")
+					
+					var blueprintID string = "lamp_8_bitnami"
+					var profileName string = "matrix"
+
+					projectName = cCtx.Args().First()
+
+					if projectName == "" {
+						color.Red("× Error: Missing project name")
+						os.Exit(1)
+					}
+
+					// Check if project is craft
+					if fileExists("/craft") {
+						projectType = "craft"
+					}
+
+					// Check if project is wordpress
+					if fileExists("/wp-content") {
+						projectType = "wordpress"
+					}
+
+					// Create deploy script
+					data :=	"#!/bin/bash\n"
+
+					if projectType == "craft" {
+						data += "cd /home/bitnami/htdocs\n"
+						// TODO: finish deploy script
+					}
+
+					if projectType == "wordpress" {
+						data += "cd /home/bitnami/wordpress\n"
+						// TODO: finish deploy script
+					}
+
+					// If deploy.sh script already exists then make a copy and delete it
+					if fileExists("deploy.sh") {
+						runCommand(exec.Command("mv", "deploy.sh", "deploy.sh.old"), false, false, true)
+					}
+
+					// Write to deploy.sh
+					color.White("Writing to: deploy.sh")
+					f, err := os.OpenFile("deploy.sh", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+					if err != nil {
+						log.Fatal(err)
+					}
+					defer f.Close()
+					if _, err := f.WriteString(data); err != nil {
+						log.Fatal(err)
+					}
+					
+					color.Green("✓ Completed: Writing to: deploy.sh")
+
+					// Deploy a lightsail instance using the git repo from the current directory
+					cmd := exec.Command("aws", "lightsail", "create-instances", "--instance-names", projectName, "--availability-zone", "eu-west-2a", "--blueprint-id", blueprintID, "--bundle-id", "nano_3_0", "--user-data", "file://deploy.sh", "--profile", profileName)
+
+					out, err := cmd.Output()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.Red("× " + err.Error())
+						os.Exit(1)
+					}
+					fmt.Println(string(out))
+
+					color.Green("✓ Completed: Deploying project to AWS Lightsail")
+
+					// Delete deploy.sh file
+					runCommand(exec.Command("rm", "deploy.sh"), false, false, true)
+
+					return nil
+				},
+			},
+			{
+				Name:    "backup",
+				Aliases: []string{"b"},
+				Usage:   "Backup project to S3",
+				Action: func(cCtx *cli.Context) error {
+					color.Magenta("Backing up project to AWS S3")
+
+					projectName = cCtx.Args().First()
+
+					if projectName == "" {
+						color.Red("× Error: Missing project name")
+						os.Exit(1)
+					}
+
+					// Check if project is craft
+					if fileExists("/craft") {
+						projectType = "craft"
+					}
+
+					// Check if project is wordpress
+					if fileExists("/wp-content") {
+						projectType = "wordpress"
+					}
+
+					// Mysql server info
+					var mysqlHost string = projectName
+					var mysqlPort string = "3306"
+					var mysqlUser string = "db"
+					var mysqlPass string = "db"
+					var mysqlDatabase string = "db"
+
+					// Get mysql server info from .env
+					if projectType == "craft" && fileExists(projectName + "/.env") {
+						err := godotenv.Load(projectName + "/.env")
+						if err != nil {
+							log.Fatal("Error loading .env file")
+						}
+
+						mysqlHost = os.Getenv("DB_HOST")
+						mysqlPort = os.Getenv("DB_PORT")
+						mysqlUser = os.Getenv("DB_USER")
+						mysqlPass = os.Getenv("DB_PASSWORD")
+						mysqlDatabase = os.Getenv("DB_DATABASE")
+					}
+
+					// Get mysql server info from wp-config.php
+					if projectType == "wordpress" && fileExists("/wp-config.php") {
+						// TODO: Get mysql server info from wp-config.php
+					}
+
+					// Use these details to create a sql backup file using mysqldump
+					runCommand(exec.Command("mysqldump", "-h", mysqlHost, "-P", mysqlPort, "-u", mysqlUser, "-p"+mysqlPass, mysqlDatabase, "--single-transaction", "--quick", "--lock-tables=false", "--result-file="+projectName+".sql"), false, true, false)
+
+					// Zip up the sql backup file
+					runCommand(exec.Command("zip", "-r", projectName+".zip", projectName+".sql"), false, true, false)
+
+					// Change file name to include date
+					runCommand(exec.Command("mv", projectName+".zip", projectName+"-"+time.Now().Format("2006-01-02")+".zip"), false, true, false)
+
+					// Upload to AWS S3
+					runCommand(exec.Command("aws", "s3", "cp", projectName+"-"+time.Now().Format("2006-01-02")+".zip", "s3://matrixcreate/"+projectName+"/database", "--profile", "matrix"), false, true, false)
+
+					// Create zip of project files
+					runCommand(exec.Command("zip", "-r", projectName+".zip"), false, true, false)
+
+					// Change file name to include date
+					runCommand(exec.Command("mv", projectName+".zip", projectName+"-"+time.Now().Format("2006-01-02")+".zip"), false, true, false)
+
+					// Upload to AWS S3
+					runCommand(exec.Command("aws", "s3", "cp", projectName+"-"+time.Now().Format("2006-01-02")+".zip", "s3://matrixcreate/"+projectName+"/files", "--profile", "matrix"), false, true, false)
+				
+					return nil
+				},
+			},
+			{
 				Name:    "update",
 				Aliases: []string{"self-update"},
 				Usage:   "Self Update Matrix CLI",
@@ -156,13 +362,144 @@ func main() {
 	}
 }
 
-func setupEnv() {
-	if fileExists(".env") {
-		err := godotenv.Load()
-		if err != nil {
-			log.Fatal("Error loading .env file")
-		}
+func configureMatrix() {
+	// If config already setup then exit
+	if fileExists(os.Getenv("HOME") + "/.matrix/config") {
+		color.Green("✓ Matrix CLI Already Configured")
+
+		return
 	}
+
+	// Create config file
+	userMatrixPath := os.Getenv("HOME") + "/.matrix"
+	userMatrixConfigPath := userMatrixPath + "/config"
+
+	// AWS SSO config vars
+	var awsRegion string = ""
+	var awsAccountID string = ""
+	var awsStartURL string = ""
+	var awsRoleName string = ""
+
+	// Promp for input for each AWS SSO config vars
+	color.White("Enter AWS Region")
+	fmt.Scan(&awsRegion)
+	color.White("Enter AWS Account ID")
+	fmt.Scan(&awsAccountID)
+	color.White("Enter AWS Start URL")
+	fmt.Scan(&awsStartURL)
+	color.White("Enter AWS Role Name")
+	fmt.Scan(&awsRoleName)
+
+	// Setup aws config data
+	userMatrixConfigData := "aws_region = " + awsRegion + "\n"
+	userMatrixConfigData += "aws_account_id = " + awsAccountID + "\n"
+	userMatrixConfigData += "aws_start_url = " + awsStartURL + "\n"
+	userMatrixConfigData += "aws_role_name = " + awsRoleName + "\n\n"
+
+	if !fileExists(userMatrixPath) {
+		runCommand(exec.Command("mkdir", "-p", userMatrixPath), false, false, true)
+	}
+
+	// Write to ~/.matrix/config
+	color.White("Writing to: " + userMatrixConfigPath)
+	f, err := os.OpenFile(userMatrixConfigPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(userMatrixConfigData); err != nil {
+		log.Fatal(err)
+	}
+
+	color.Green("✓ Completed: Writing to: " + userMatrixConfigPath)
+
+	color.Magenta("--------------------------------------------------")
+	color.Magenta("🎉            MATRIX POWER ACTIVATED            🎉")
+	color.Magenta("--------------------------------------------------")
+}
+
+func configureGithub() {
+	// run command: gh auth login and allow to reply to prompt
+	s.Stop()
+	cmd := exec.Command("gh", "auth", "login", "--git-protocol", "ssh")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Run()
+
+	color.Magenta("--------------------------------------------------")
+	color.Magenta("🎉            GITHUB POWER ACTIVATED            🎉")
+	color.Magenta("--------------------------------------------------")
+}
+
+func configureAWS() {
+	color.Magenta("Configuring Matrix CLI with AWS IAM Identity Center")
+
+	userAwsPath := os.Getenv("HOME") + "/.aws"
+	profileName := "matrix"
+
+	// Get AWS SSO config vars from ~/.matrix/config
+	var ssoRegion string = ""
+	var ssoAccountID string = ""
+	var ssoStartUrl string = ""
+	var ssoRoleName string = ""
+
+	if fileExists(os.Getenv("HOME") + "/.matrix/config") {
+		err := godotenv.Load(os.Getenv("HOME") + "/.matrix/config")
+		if err != nil {
+			log.Fatal("Error loading .matrix/config file")
+		}
+		
+		ssoRegion = os.Getenv("aws_region")
+		ssoAccountID = os.Getenv("aws_account_id")
+		ssoStartUrl = os.Getenv("aws_start_url")
+		ssoRoleName = os.Getenv("aws_role_name")
+	} else {
+		color.Red("× Error: Missing ~/.matrix/config file")
+		os.Exit(1)
+	}
+
+	if !fileExists(userAwsPath + "/config") {
+		runCommand(exec.Command("mkdir", "-p", userAwsPath), false, false, true)
+	} else {
+		// Rename old config file
+		runCommand(exec.Command("mv", userAwsPath+"/config", userAwsPath+"/config.old"), false, false, true)
+	}
+
+	// Setup aws config data
+	data :=	"[profile " + profileName + "]\n"
+	data += "sso_session = matrix-sso\n"
+	data += "sso_role_name = " + ssoRoleName + "\n"
+	data += "sso_account_id = " + ssoAccountID + "\n"
+	data += "region = " + ssoRegion + "\n"
+	data += "output = json\n\n"
+	data += "[sso-session matrix-sso]\n"
+	data += "sso_region = " + ssoRegion + "\n"
+	data += "sso_start_url = " + ssoStartUrl + "\n"
+	data += "sso_registration_scopes = sso:account:access\n"
+
+	// Write to ~/.aws/config
+	color.White("Writing to: " + userAwsPath + "/config")
+	f, err := os.OpenFile(userAwsPath+"/config", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(data); err != nil {
+		log.Fatal(err)
+	}
+	color.Green("✓ Completed: Writing to: " + userAwsPath + "/config")
+
+	// Redirect to login to AWS SSO
+	cmd := exec.Command("aws", "sso", "login", "--profile", profileName)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Run()
+
+	color.Magenta("--------------------------------------------------")
+	color.Magenta("🎉            AWS POWER ACTIVATED               🎉")
+	color.Magenta("--------------------------------------------------")
 }
 
 func setupProject(freshMode bool, shallowMode bool, valetMode bool) {
@@ -271,7 +608,6 @@ func setupProject(freshMode bool, shallowMode bool, valetMode bool) {
 }
 
 func runCommand(cmd *exec.Cmd, showOutput bool, inProject bool, exitOnError bool) {
-	s := spinner.New(spinner.CharSets[25], 100*time.Millisecond)
 	s.Start()
 
 	if inProject {
