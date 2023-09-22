@@ -38,6 +38,26 @@ func main() {
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
 			{
+				Name:   "daemon",
+				Aliases: []string{"d"},
+				Usage:  "Run Matrix CLI Daemon",
+				Action: func(cCtx *cli.Context) error {
+					// Check if php is running every minute
+					for {
+						// Check if php is running
+						cmd := exec.Command("ps", "-ef")
+						out, err := cmd.Output()
+						if err != nil {
+							color.Red("× Error Running: " + cmd.String())
+							color.Red("× " + err.Error())
+							os.Exit(1)
+						}
+
+						time.Sleep(1 * time.Minute)
+					}
+				},
+			},
+			{
 				Name:   "status",
 				Aliases: []string{"s"},
 				Usage:  "Show status of Matrix CLI",
@@ -273,7 +293,7 @@ func main() {
 
 					// Start creating deploy script
 					data :=	"#!/bin/bash\n"
-					
+						
 					// cd to htdocs directory
 					data += "cd /home/bitnami/htdocs\n"
 
@@ -281,11 +301,11 @@ func main() {
 					data += "rm index.html\n"
 
 					if projectType == "craft" {
-						// Edit /opt/bitnami/apache/conf/bitnami/bitnami.conf and change /home/bitnami/htdocs to /home/bitnami/htdocs/web and save
-						data += "sed -i 's/\\/home\\/bitnami\\/htdocs/\\/home\\/bitnami\\/htdocs\\/web/g' /opt/bitnami/apache/conf/bitnami/bitnami.conf\n"
+						// Edit /opt/bitnami/apache/conf/bitnami/bitnami.conf and change /opt/bitnami/apache/htdocs to /opt/bitnami/apache/htdocs/web and save
+						data += "sed -i 's|/opt/bitnami/apache/htdocs|/opt/bitnami/apache/htdocs/web|g' /opt/bitnami/apache2/conf/bitnami/bitnami.conf\n"
 					
 						// Restart Apache
-						data += "sudo /opt/bitnami/ctlscript.sh restart apache\n"
+						data += "/opt/bitnami/ctlscript.sh restart apache\n"
 					}
 
 					// git clone repo into current directory
@@ -294,33 +314,37 @@ func main() {
 					// chown -R bitnami:daemon /home/bitnami/htdocs
 					data += "chown -R bitnami:daemon /home/bitnami/htdocs/\n"
 
-					// if composer file exists on the instance then run composer install
-					data += "if [ -f \"composer.json\" ]; then\n"
-					data += "composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader\n"
-					data += "fi\n"
-
-					// if package.json file exists on the instance then run npm install
-					data += "if [ -f \"package.json\" ]; then\n"
-					data += "npm install\n"
-					data += "fi\n"
-
-					// if craft file exists on the instance then run craft setup commands
-					if projectType == "craft" {
-						// php craft setup/app-id --interactive=0
-						data += "php craft setup/app-id --interactive=0\n"
-
-						// php craft setup/security-key
-						data += "php craft setup/security-key\n"
-					}
-					
-					// TODO: Database setup and migrations etc...
-
 					// Install Go
-					data += "sudo apt -y install golang-go\n"
+					data += "apt install -y golang-go\n"
 
 					// Install Matrix CLI
 					data += "go install github.com/MatrixCreate/matrix@latest\n"
 					
+					// Setup daemon to run 'matrix daemon' command and keep it alive
+					data += "cat <<EOF > /etc/systemd/system/matrix.service\n"
+					data += "[Unit]\n"
+					data += "Description=Matrix CLI Daemon\n"
+					data += "After=network.target\n"
+					data += "\n"
+					data += "[Service]\n"
+					data += "Type=simple\n"
+					data += "Restart=always\n"
+					data += "RestartSec=5s\n"
+					data += "ExecStart=/usr/local/go/bin/matrix daemon\n"
+					data += "\n"
+					data += "[Install]\n"
+					data += "WantedBy=multi-user.target\n"
+					data += "EOF\n"
+
+					// Reload daemon
+					data += "systemctl daemon-reload\n"
+
+					// Enable Matrix CLI service
+					data += "systemctl enable matrix.service\n"
+
+					// Start Matrix CLI service
+					data += "systemctl start matrix.service\n"
+
 					// If deploy.sh script already exists then make a copy and delete it
 					if fileExists("deploy.sh") {
 						runCommand(exec.Command("mv", "deploy.sh", "deploy.sh.old"), false, false, true)
