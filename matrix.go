@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
@@ -22,7 +22,7 @@ var s *spinner.Spinner = spinner.New(spinner.CharSets[25], 100*time.Millisecond)
 
 func main() {
 	app := &cli.App{
-		Name:      "Matrix CLI",
+		Name: "Matrix CLI",
 		Authors: []*cli.Author{
 			{
 				Name:  "Adam Glaysher",
@@ -37,30 +37,30 @@ func main() {
 		Copyright: "(c) 2023 Matrix Create",
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
-			{
-				Name:   "daemon",
-				Aliases: []string{"d"},
-				Usage:  "Run Matrix CLI Daemon",
-				Action: func(cCtx *cli.Context) error {
-					// Check if php is running every minute
-					for {
-						// Check if php is running
-						cmd := exec.Command("ps", "-ef")
-						out, err := cmd.Output()
-						if err != nil {
-							color.Red("× Error Running: " + cmd.String())
-							color.Red("× " + err.Error())
-							os.Exit(1)
-						}
+			// {
+			// 	Name:   "daemon",
+			// 	Aliases: []string{"d"},
+			// 	Usage:  "Run Matrix CLI Daemon",
+			// 	Action: func(cCtx *cli.Context) error {
+			// 		// Check if php is running every minute
+			// 		for {
+			// 			// Check if php is running
+			// 			cmd := exec.Command("ps", "-ef")
+			// 			out, err := cmd.Output()
+			// 			if err != nil {
+			// 				color.Red("× Error Running: " + cmd.String())
+			// 				color.Red("× " + err.Error())
+			// 				os.Exit(1)
+			// 			}
 
-						time.Sleep(1 * time.Minute)
-					}
-				},
-			},
+			// 			time.Sleep(1 * time.Minute)
+			// 		}
+			// 	},
+			// },
 			{
-				Name:   "status",
+				Name:    "status",
 				Aliases: []string{"s"},
-				Usage:  "Show status of Matrix CLI",
+				Usage:   "Show status of Matrix CLI",
 				Action: func(cCtx *cli.Context) error {
 					color.Magenta("Matrix CLI Status")
 
@@ -90,9 +90,9 @@ func main() {
 				},
 			},
 			{
-				Name:   "configure",
+				Name:    "configure",
 				Aliases: []string{"c", "config"},
-				Usage:  "Configure Matrix CLI with AWS IAM Identity Center and Github CLI",
+				Usage:   "Configure Matrix CLI with AWS IAM Identity Center and Github CLI",
 				Action: func(cCtx *cli.Context) error {
 					configureMatrix()
 					configureAWS()
@@ -216,7 +216,7 @@ func main() {
 				Action: func(cCtx *cli.Context) error {
 					// Deploy a lightsail instance using the git repo from the current directory
 					color.Magenta("Deploying project to AWS Lightsail")
-					
+
 					var blueprintID string = "lamp_8_bitnami"
 					var profileName string = "matrix"
 
@@ -292,8 +292,8 @@ func main() {
 					color.White("Git Remote URL: " + gitRemoteUrl)
 
 					// Start creating deploy script
-					data :=	"#!/bin/bash\n"
-						
+					data := "#!/bin/bash\n"
+
 					// cd to htdocs directory
 					data += "cd /home/bitnami/htdocs\n"
 
@@ -303,7 +303,7 @@ func main() {
 					if projectType == "craft" {
 						// Edit /opt/bitnami/apache/conf/bitnami/bitnami.conf and change /opt/bitnami/apache/htdocs to /opt/bitnami/apache/htdocs/web and save
 						data += "sed -i 's|/opt/bitnami/apache/htdocs|/opt/bitnami/apache/htdocs/web|g' /opt/bitnami/apache2/conf/bitnami/bitnami.conf\n"
-					
+
 						// Restart Apache
 						data += "/opt/bitnami/ctlscript.sh restart apache\n"
 					}
@@ -319,7 +319,7 @@ func main() {
 
 					// Install Matrix CLI
 					data += "go install github.com/MatrixCreate/matrix@latest\n"
-					
+
 					// Setup daemon to run 'matrix daemon' command and keep it alive
 					data += "cat <<EOF > /etc/systemd/system/matrix.service\n"
 					data += "[Unit]\n"
@@ -360,7 +360,7 @@ func main() {
 					if _, err := f.WriteString(data); err != nil {
 						log.Fatal(err)
 					}
-					
+
 					color.Green("✓ Completed: Writing to: deploy.sh")
 
 					// Deploy a lightsail instance using the git repo from the current directory
@@ -446,70 +446,138 @@ func main() {
 				Action: func(cCtx *cli.Context) error {
 					color.Magenta("Backing up project to AWS S3")
 
-					projectName = cCtx.Args().First()
-
-					if projectName == "" {
-						color.Red("× Error: Missing project name")
+					// Check if mysql is installed or exit
+					cmd := exec.Command("mysql", "--version")
+					_, err := cmd.Output()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.Red("× " + err.Error())
 						os.Exit(1)
 					}
 
+					color.Green("✓ MySQL is installed")
+
+					// Get the current directory name
+					workingDir, err := os.Getwd()
+					if err != nil {
+						color.Red("× Error: " + err.Error())
+						os.Exit(1)
+					}
+
+					projectName = strings.Split(workingDir, "/")[len(strings.Split(workingDir, "/"))-1]
+
 					// Check if project is craft
-					if fileExists("/craft") {
+					if fileExists("./craft") {
 						projectType = "craft"
-					}
 
-					// Check if project is wordpress
-					if fileExists("/wp-content") {
-						projectType = "wordpress"
-					}
+						color.Green("✓ Craft Detected")
 
-					// Mysql server info
-					var mysqlHost string = projectName
-					var mysqlPort string = "3306"
-					var mysqlUser string = "db"
-					var mysqlPass string = "db"
-					var mysqlDatabase string = "db"
+						// check if .env file
+						if !fileExists("./.env") {
+							color.Red("× Error: Missing .env file")
+							os.Exit(1)
+						}
 
-					// Get mysql server info from .env
-					if projectType == "craft" && fileExists(projectName + "/.env") {
-						err := godotenv.Load(projectName + "/.env")
+						// Get DB settings from .env file
+						err := godotenv.Load("./.env")
 						if err != nil {
 							log.Fatal("Error loading .env file")
 						}
 
-						mysqlHost = os.Getenv("DB_HOST")
-						mysqlPort = os.Getenv("DB_PORT")
-						mysqlUser = os.Getenv("DB_USER")
-						mysqlPass = os.Getenv("DB_PASSWORD")
-						mysqlDatabase = os.Getenv("DB_DATABASE")
+						// Get DB settings from .env file
+						var dbDriver string = os.Getenv("DB_DRIVER")
+						var dbServer string = os.Getenv("DB_SERVER")
+						var dbPort string = os.Getenv("DB_PORT")
+						var dbUser string = os.Getenv("DB_USER")
+						var dbPassword string = os.Getenv("DB_PASSWORD")
+						var dbName string = os.Getenv("DB_DATABASE")
+
+						// Check if DB settings are empty
+						if dbDriver == "" || dbServer == "" || dbPort == "" || dbUser == "" || dbPassword == "" || dbName == "" {
+							color.Red("× Error: Missing DB settings in .env file")
+							os.Exit(1)
+						}
+
+						// backup the database using mysqldump
+						cmd = exec.Command(
+							"mysqldump",
+							"-u", dbUser,
+							"-p"+dbPassword,
+							"-h", dbServer,
+							"-P", dbPort,
+							dbName,
+							"--single-transaction",
+							"--quick",
+							"--lock-tables=false",
+							"--routines",
+							"--triggers",
+							"--events",
+							"--set-gtid-purged=OFF",
+							"--column-statistics=0",
+							"--skip-comments",
+							"--skip-dump-date",
+							"--skip-set-charset",
+							"--skip-add-locks",
+							"--skip-disable-keys",
+							"--skip-tz-utc",
+							"--skip-lock-tables",
+							"--result-file="+projectName+".sql",
+						)
+
+						color.White("Running: " + cmd.String())
+
+						err = cmd.Run()
+						if err != nil {
+							color.Red("× Error Running: " + cmd.String())
+							color.Red("× " + err.Error())
+							os.Exit(1)
+						}
+
+						color.Green("✓ Completed: Database backup file created locally")
 					}
 
-					// Get mysql server info from wp-config.php
-					if projectType == "wordpress" && fileExists("/wp-config.php") {
-						// TODO: Get mysql server info from wp-config.php
+					// Check if project is wordpress
+					if fileExists("./wp-content") {
+						projectType = "wordpress"
+
+						color.White("✓ WordPress Detected")
+
+						// Exit as currently don't support wordpress backups
+						color.Red("× Error: WordPress backups are not currently supported")
+						os.Exit(1)
 					}
 
-					// Use these details to create a sql backup file using mysqldump
-					runCommand(exec.Command("mysqldump", "-h", mysqlHost, "-P", mysqlPort, "-u", mysqlUser, "-p"+mysqlPass, mysqlDatabase, "--single-transaction", "--quick", "--lock-tables=false", "--result-file="+projectName+".sql"), false, true, false)
+					// tar.gz the sql file
+					runCommand(exec.Command("tar", "-czvf", projectName+".sql.tar.gz", projectName+".sql"), false, false, false)
 
-					// Zip up the sql backup file
-					runCommand(exec.Command("zip", "-r", projectName+".zip", projectName+".sql"), false, true, false)
+					// Rename file to date and time
+					var fileName = projectName + "-" + time.Now().Format("2006-01-02-15-04-05") + ".sql.tar.gz"
+					runCommand(exec.Command("mv", projectName+".sql.tar.gz", fileName), false, false, false)
 
-					// Change file name to include date
-					runCommand(exec.Command("mv", projectName+".zip", projectName+"-"+time.Now().Format("2006-01-02")+".zip"), false, true, false)
+					// Upload to AWS S3 aws
+					cmd = exec.Command("aws", "s3", "cp", fileName, "s3://"+projectName+"/backups/"+fileName, "--profile", "matrix")
 
-					// Upload to AWS S3
-					runCommand(exec.Command("aws", "s3", "cp", projectName+"-"+time.Now().Format("2006-01-02")+".zip", "s3://matrixcreate/"+projectName+"/database", "--profile", "matrix"), false, true, false)
+					color.White("Running: " + cmd.String())
 
-					// Create zip of project files
-					runCommand(exec.Command("zip", "-r", projectName+".zip"), false, true, false)
+					err = cmd.Run()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.White("Your AWS token probably has expired. Run 'matrix configure' to setup AWS CLI Auth again")
+						os.Exit(1)
+					}
 
-					// Change file name to include date
-					runCommand(exec.Command("mv", projectName+".zip", projectName+"-"+time.Now().Format("2006-01-02")+".zip"), false, true, false)
+					color.Green("✓ Completed: Backup uploaded to S3")
 
-					// Upload to AWS S3
-					runCommand(exec.Command("aws", "s3", "cp", projectName+"-"+time.Now().Format("2006-01-02")+".zip", "s3://matrixcreate/"+projectName+"/files", "--profile", "matrix"), false, true, false)
-				
+					// Delete local backup file
+					runCommand(exec.Command("rm", fileName), false, false, true)
+
+					// Delete local sql file
+					runCommand(exec.Command("rm", projectName+".sql"), false, false, true)
+
+					color.Magenta("--------------------------------------------------")
+					color.Magenta("🎉            BACKUP COMPLETE                   🎉")
+					color.Magenta("--------------------------------------------------")
+
 					return nil
 				},
 			},
@@ -522,7 +590,9 @@ func main() {
 
 					runCommand(exec.Command("go", "install", "github.com/MatrixCreate/matrix@latest"), false, false, true)
 
-					color.Magenta("Updated!")
+					color.Magenta("--------------------------------------------------")
+					color.Magenta("🎉            UPDATE COMPLETE                   🎉")
+					color.Magenta("--------------------------------------------------")
 
 					return nil
 				},
@@ -622,7 +692,7 @@ func configureAWS() {
 		if err != nil {
 			log.Fatal("Error loading .matrix/config file")
 		}
-		
+
 		ssoRegion = os.Getenv("aws_region")
 		ssoAccountID = os.Getenv("aws_account_id")
 		ssoStartUrl = os.Getenv("aws_start_url")
@@ -640,7 +710,7 @@ func configureAWS() {
 	}
 
 	// Setup aws config data
-	data :=	"[profile " + profileName + "]\n"
+	data := "[profile " + profileName + "]\n"
 	data += "sso_session = matrix-sso\n"
 	data += "sso_role_name = " + ssoRoleName + "\n"
 	data += "sso_account_id = " + ssoAccountID + "\n"
