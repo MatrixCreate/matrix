@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -214,18 +215,27 @@ func main() {
 				Aliases: []string{"d"},
 				Usage:   "Deploy project to AWS Lightsail",
 				Action: func(cCtx *cli.Context) error {
-					// Deploy a lightsail instance using the git repo from the current directory
-					color.Magenta("Deploying project to AWS Lightsail")
+					// Deploy an AWS EC2 instance using the git repo from the current directory using launch template
+					color.Magenta("Deploying project to AWS")
 
-					var blueprintID string = "lamp_8_bitnami"
+					var launchTemplateName string = "matrix-2023-10-01"
+					var instanceType string = "t2.micro"
 					var profileName string = "matrix"
 
 					// Get project name
 					projectName = cCtx.Args().First()
 
 					if projectName == "" {
-						color.Red("× Error: Missing project name")
-						os.Exit(1)
+						// Get project name from current directory
+						workingDir, err := os.Getwd()
+						if err != nil {
+							color.Red("× Error: " + err.Error())
+							os.Exit(1)
+						}
+
+						projectName = strings.Split(workingDir, "/")[len(strings.Split(workingDir, "/"))-1]
+
+						color.White("Project Name: " + projectName)
 					}
 
 					// Check if project is craft
@@ -238,7 +248,7 @@ func main() {
 						projectType = "wordpress"
 					}
 
-					// Run gh auth token to get github token and store in variable
+					// Get github token
 					cmd := exec.Command("gh", "auth", "token")
 					out, err := cmd.Output()
 					if err != nil {
@@ -294,56 +304,19 @@ func main() {
 					// Start creating deploy script
 					data := "#!/bin/bash\n"
 
-					// cd to htdocs directory
-					data += "cd /home/bitnami/htdocs\n"
+					// cd to /var/www/html
+					data += "cd /var/www/html\n"
 
-					// Remove index.html
-					data += "rm index.html\n"
+					// if projectType == "craft" {
+					// 	// Edit /opt/bitnami/apache/conf/bitnami/bitnami.conf and change /opt/bitnami/apache/htdocs to /opt/bitnami/apache/htdocs/web and save
+					// 	data += "sed -i 's|/opt/bitnami/apache/htdocs|/opt/bitnami/apache/htdocs/web|g' /opt/bitnami/apache2/conf/bitnami/bitnami.conf\n"
 
-					if projectType == "craft" {
-						// Edit /opt/bitnami/apache/conf/bitnami/bitnami.conf and change /opt/bitnami/apache/htdocs to /opt/bitnami/apache/htdocs/web and save
-						data += "sed -i 's|/opt/bitnami/apache/htdocs|/opt/bitnami/apache/htdocs/web|g' /opt/bitnami/apache2/conf/bitnami/bitnami.conf\n"
-
-						// Restart Apache
-						data += "/opt/bitnami/ctlscript.sh restart apache\n"
-					}
+					// 	// Restart Apache
+					// 	data += "/opt/bitnami/ctlscript.sh restart apache\n"
+					// }
 
 					// git clone repo into current directory
 					data += "git clone " + gitRemoteUrl + " .\n"
-
-					// chown -R bitnami:daemon /home/bitnami/htdocs
-					data += "chown -R bitnami:daemon /home/bitnami/htdocs/\n"
-
-					// Install Go
-					data += "apt install -y golang-go\n"
-
-					// Install Matrix CLI
-					data += "go install github.com/MatrixCreate/matrix@latest\n"
-
-					// Setup daemon to run 'matrix daemon' command and keep it alive
-					data += "cat <<EOF > /etc/systemd/system/matrix.service\n"
-					data += "[Unit]\n"
-					data += "Description=Matrix CLI Daemon\n"
-					data += "After=network.target\n"
-					data += "\n"
-					data += "[Service]\n"
-					data += "Type=simple\n"
-					data += "Restart=always\n"
-					data += "RestartSec=5s\n"
-					data += "ExecStart=/usr/local/go/bin/matrix daemon\n"
-					data += "\n"
-					data += "[Install]\n"
-					data += "WantedBy=multi-user.target\n"
-					data += "EOF\n"
-
-					// Reload daemon
-					data += "systemctl daemon-reload\n"
-
-					// Enable Matrix CLI service
-					data += "systemctl enable matrix.service\n"
-
-					// Start Matrix CLI service
-					data += "systemctl start matrix.service\n"
 
 					// If deploy.sh script already exists then make a copy and delete it
 					if fileExists("deploy.sh") {
@@ -363,21 +336,27 @@ func main() {
 
 					color.Green("✓ Completed: Writing to: deploy.sh")
 
-					// Deploy a lightsail instance using the git repo from the current directory
-					cmd = exec.Command("aws", "lightsail", "create-instances", "--instance-names", projectName, "--availability-zone", "eu-west-2a", "--blueprint-id", blueprintID, "--bundle-id", "nano_3_0", "--user-data", "file://deploy.sh", "--profile", profileName)
-
+					// Run a EC2 instance using the git repo from the current directory
+					cmd = exec.Command("aws", "ec2", "run-instances", "--launch-template", "LaunchTemplateName="+launchTemplateName, "--instance-type", instanceType, "--user-data", "file://deploy.sh", "--tag-specifications", "ResourceType=instance,Tags=[{Key=Name,Value="+projectName+"}]", "--profile", profileName)
 					out, err = cmd.Output()
 					if err != nil {
 						color.Red("× Error Running: " + cmd.String())
 						color.Red("× " + err.Error())
+						// More error details (TODO: Add to more errors)
+						color.Red("× " + string(err.(*exec.ExitError).Stderr))
 						os.Exit(1)
 					}
-					fmt.Println(string(out))
+
+					// Get instance ID from JSON
+					instanceID := strings.Split(string(out), "\"InstanceId\": \"")[1]
+					instanceID = strings.Split(instanceID, "\"")[0]
+
+					color.White("Instance ID: " + instanceID)
 
 					// Delete deploy.sh file
 					runCommand(exec.Command("rm", "deploy.sh"), false, false, true)
 
-					color.Green("✓ Completed: Deploying project to AWS Lightsail")
+					color.Green("✓ Completed: Started new EC2 instance")
 
 					color.Magenta("--------------------------------------------------")
 					color.Magenta("🎉            DEPLOYMENT STARTED                🎉")
@@ -386,21 +365,16 @@ func main() {
 					// Check if instance is running and wait until it is
 					color.Magenta("Checking if instance is running")
 
-					cmd = exec.Command("aws", "lightsail", "get-instance-state", "--instance-name", projectName, "--profile", profileName)
+					var instanceState string = "pending"
 
-					out, err = cmd.Output()
-					if err != nil {
-						color.Red("× Error Running: " + cmd.String())
-						color.Red("× " + err.Error())
-						os.Exit(1)
-					}
-					fmt.Println(string(out))
+					// Set spinner message
+					s.Suffix = " Instance Status: " + instanceState
 
-					// Wait until instance is running
-					for strings.Contains(string(out), "pending") {
-						color.Magenta("Waiting for instance to start")
+					// Start the spinner
+					s.Start()
 
-						cmd = exec.Command("aws", "lightsail", "get-instance-state", "--instance-name", projectName, "--profile", profileName)
+					for instanceState != "running" {
+						cmd = exec.Command("aws", "ec2", "describe-instances", "--instance-ids", instanceID, "--profile", profileName)
 
 						out, err = cmd.Output()
 						if err != nil {
@@ -408,19 +382,30 @@ func main() {
 							color.Red("× " + err.Error())
 							os.Exit(1)
 						}
-						fmt.Println(string(out))
 
-						time.Sleep(5 * time.Second)
+						// Get ['Reservations'][0]['Instances'][0]['State']['Name']
+						var result map[string]interface{}
+						json.Unmarshal([]byte(out), &result)
+						instanceState = result["Reservations"].([]interface{})[0].(map[string]interface{})["Instances"].([]interface{})[0].(map[string]interface{})["State"].(map[string]interface{})["Name"].(string)
+
+						// Update spinner status
+						s.Suffix = " Instance Status: " + instanceState
+
+						// Wait 10 seconds
+						time.Sleep(10 * time.Second)
 					}
 
-					color.Green("✓ Completed: Instance is running")
+					// Stop the spinner
+					s.Stop()
+
+					color.Green("✓ Success: Instance is running")
 
 					color.Magenta("--------------------------------------------------")
 					color.Magenta("🎉            DEPLOYMENT COMPLETE               🎉")
 					color.Magenta("--------------------------------------------------")
 
 					// Get IP of the new instance as a var
-					cmd = exec.Command("aws", "lightsail", "get-instance", "--instance-name", projectName, "--profile", profileName)
+					cmd = exec.Command("aws", "ec2", "describe-instances", "--filters", "Name=tag:Name,Values="+projectName, "--profile", profileName)
 
 					out, err = cmd.Output()
 					if err != nil {
@@ -429,8 +414,8 @@ func main() {
 						os.Exit(1)
 					}
 
-					// Get ['instance']['publicIpAddress'] from JSON and not anything after
-					instancePublicIpAddress := strings.Split(string(out), "\"publicIpAddress\": \"")[1]
+					// Get ['Reservations'][0]['Instances'][0]['PublicIpAddress']
+					instancePublicIpAddress := strings.Split(string(out), "\"PublicIpAddress\": \"")[1]
 					instancePublicIpAddress = strings.Split(instancePublicIpAddress, "\"")[0]
 
 					// Print IP
