@@ -51,3 +51,7 @@ Matrix CLI is a command line tool for managing Matrix projects.
     export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
     ```
 4. `matrix help`
+
+## Building Executable ##
+
+`GOOS=linux GOARCH=amd64 go build`
