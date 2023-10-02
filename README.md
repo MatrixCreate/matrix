@@ -1,7 +1,7 @@
 # Matrix CLI #
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/MatrixCreate/matrix)](https://goreportcard.com/report/github.com/MatrixCreate/matrix)
-![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 ## About ##
 Matrix CLI is a command line tool for managing Matrix projects.

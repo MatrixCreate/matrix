@@ -848,7 +848,7 @@ func runCommand(cmd *exec.Cmd, showOutput bool, inProject bool, exitOnError bool
 			if exitOnError {
 				color.Red("× Error Running: " + cmd.String())
 				color.Red("× " + err.Error())
-				color.White("Tip: Run the above command seperately for more info to find out what went wrong")
+				color.White("Tip: Run the above command separately for more info to find out what went wrong")
 				os.Exit(commandCount)
 			} else {
 				color.Yellow("× Error Running: " + cmd.String())
