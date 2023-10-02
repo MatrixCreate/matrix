@@ -17,7 +17,7 @@ import (
 
 var craftStarterRepo string = "git@github.com:MatrixCreate/craft-starter.git"
 var projectName string = ""
-var projectType string = "unknown"
+var projectType string = ""
 var commandCount int = 0
 var s *spinner.Spinner = spinner.New(spinner.CharSets[25], 100*time.Millisecond)
 
@@ -38,26 +38,6 @@ func main() {
 		Copyright: "(c) 2023 Matrix Create",
 		Usage:     "Project Management CLI Tool",
 		Commands: []*cli.Command{
-			// {
-			// 	Name:   "daemon",
-			// 	Aliases: []string{"d"},
-			// 	Usage:  "Run Matrix CLI Daemon",
-			// 	Action: func(cCtx *cli.Context) error {
-			// 		// Check if php is running every minute
-			// 		for {
-			// 			// Check if php is running
-			// 			cmd := exec.Command("ps", "-ef")
-			// 			out, err := cmd.Output()
-			// 			if err != nil {
-			// 				color.Red("× Error Running: " + cmd.String())
-			// 				color.Red("× " + err.Error())
-			// 				os.Exit(1)
-			// 			}
-
-			// 			time.Sleep(1 * time.Minute)
-			// 		}
-			// 	},
-			// },
 			{
 				Name:    "status",
 				Aliases: []string{"s"},
@@ -78,12 +58,12 @@ func main() {
 					// Check if Github CLI (gh) is installed and authed
 					runCommand(exec.Command("gh", "auth", "status"), true, false, false)
 
-					color.Green("✓ GitHub CLI installed and authed")
+					color.Green("✓ GitHub CLI is installed and authed")
 
-					// Check if AWS CLI (aws) is installed and authed
+					// TODO: Check if AWS CLI (aws) is installed and authed
 					runCommand(exec.Command("aws", "--version"), true, false, false)
 
-					color.Green("✓ AWS CLI installed and authed")
+					color.Green("✓ AWS CLI is installed and authed")
 
 					color.Green("✓ Completed: Matrix CLI Status")
 
@@ -215,7 +195,7 @@ func main() {
 				Aliases: []string{"d"},
 				Usage:   "Deploy project to AWS Lightsail",
 				Action: func(cCtx *cli.Context) error {
-					// Deploy an AWS EC2 instance using the git repo from the current directory using launch template
+					// Deploy an AWS EC2 instance using the Git repo from the current directory using launch template
 					color.Magenta("Deploying project to AWS")
 
 					var launchTemplateName string = "matrix-2023-10-01"
@@ -442,14 +422,12 @@ func main() {
 
 					color.Green("✓ MySQL is installed")
 
-					// Get the current directory name
-					workingDir, err := os.Getwd()
-					if err != nil {
-						color.Red("× Error: " + err.Error())
+					// Get project name
+					projectName = cCtx.Args().First()
+					if projectName == "" {
+						color.Red("× Error: Missing project name")
 						os.Exit(1)
 					}
-
-					projectName = strings.Split(workingDir, "/")[len(strings.Split(workingDir, "/"))-1]
 
 					// Check if project is craft
 					if fileExists("./craft") {
@@ -497,8 +475,6 @@ func main() {
 							"--routines",
 							"--triggers",
 							"--events",
-							"--set-gtid-purged=OFF",
-							"--column-statistics=0",
 							"--skip-comments",
 							"--skip-dump-date",
 							"--skip-set-charset",
@@ -532,18 +508,14 @@ func main() {
 						os.Exit(1)
 					}
 
-					// tar.gz the sql file
-					runCommand(exec.Command("tar", "-czvf", projectName+".sql.tar.gz", projectName+".sql"), false, false, false)
+					var backupFileName = projectName + "-" + time.Now().Format("2006-01-02-15-04-05")
 
-					// Rename file to date and time
-					var fileName = projectName + "-" + time.Now().Format("2006-01-02-15-04-05") + ".sql.tar.gz"
-					runCommand(exec.Command("mv", projectName+".sql.tar.gz", fileName), false, false, false)
+					runCommand(exec.Command("tar", "-czf", backupFileName+".sql.tar.gz", projectName+".sql"), false, false, false)
+					runCommand(exec.Command("tar", "--warning=no-file-changed", "-czf", backupFileName+".tar.gz", "--exclude='web/cpresources'", "--exclude='storage/runtime'", "--exclude='vendor'", "--exclude='.git'", "--exclude='"+backupFileName+".tar.gz'", "."), false, false, false)
 
-					// Upload to AWS S3 aws
-					cmd = exec.Command("aws", "s3", "cp", fileName, "s3://"+projectName+"/backups/"+fileName, "--profile", "matrix")
-
+					// Upload SQL backup to S3
+					cmd = exec.Command("aws", "s3", "cp", backupFileName+".sql.tar.gz", "s3://"+projectName+"/backups/"+backupFileName+".sql.tar.gz")
 					color.White("Running: " + cmd.String())
-
 					err = cmd.Run()
 					if err != nil {
 						color.Red("× Error Running: " + cmd.String())
@@ -551,12 +523,21 @@ func main() {
 						os.Exit(1)
 					}
 
-					color.Green("✓ Completed: Backup uploaded to S3")
+					// Upload Files backup to S3
+					cmd = exec.Command("aws", "s3", "cp", backupFileName+".tar.gz", "s3://"+projectName+"/backups/"+projectName+".tar.gz")
+					color.White("Running: " + cmd.String())
+					err = cmd.Run()
+					if err != nil {
+						color.Red("× Error Running: " + cmd.String())
+						color.White("Your AWS token probably has expired. Run 'matrix configure' to setup AWS CLI Auth again")
+						os.Exit(1)
+					}
 
-					// Delete local backup file
-					runCommand(exec.Command("rm", fileName), false, false, true)
+					color.Green("✓ Completed: Database backup uploaded to S3")
 
-					// Delete local sql file
+					// Delete local temp files
+					runCommand(exec.Command("rm", backupFileName+".sql.tar.gz"), false, false, true)
+					runCommand(exec.Command("rm", backupFileName+".tar.gz"), false, false, true)
 					runCommand(exec.Command("rm", projectName+".sql"), false, false, true)
 
 					color.Magenta("--------------------------------------------------")
