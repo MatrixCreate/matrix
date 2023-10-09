@@ -12,7 +12,7 @@ func runCommand(cmd *exec.Cmd, showOutput bool, inProject bool, exitOnError bool
 	s.Start()
 
 	if inProject {
-		cmd.Dir = "./" + projectName
+		cmd.Dir = "./" + ProjectName
 	}
 
 	color.White("Running: " + cmd.String())

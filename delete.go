@@ -9,27 +9,27 @@ import (
 )
 
 func delete(cCtx *cli.Context) {
-	color.White(projectName)
+	color.White(ProjectName)
 
-	projectName = cCtx.Args().First()
+	ProjectName = cCtx.Args().First()
 
-	if projectName == "" {
+	if ProjectName == "" {
 		color.Red("× Error: Missing project name")
 		os.Exit(1)
 	}
 
-	if !fileExists(projectName) {
+	if !fileExists(ProjectName) {
 		color.Red("× Error: Project directory not found")
 		os.Exit(2)
 	}
 
-	color.Magenta("Deleting project: " + projectName)
+	color.Magenta("Deleting project: " + ProjectName)
 
 	// ddev stop --remove-data --omit-snapshot
 	runCommand(exec.Command("ddev", "stop", "--remove-data", "--omit-snapshot"), false, true, false)
 
-	// rm -rf {projectName}
-	runCommand(exec.Command("rm", "-rf", projectName), false, false, true)
+	// rm -rf {ProjectName}
+	runCommand(exec.Command("rm", "-rf", ProjectName), false, false, true)
 
 	color.Magenta("Project Deleted!")
 }

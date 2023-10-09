@@ -9,9 +9,10 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var craftStarterRepo string = "git@github.com:MatrixCreate/craft-starter.git"
-var projectName string = ""
-var projectType string = ""
+var CraftStarterRepo string = "git@github.com:MatrixCreate/craft-starter.git"
+var ProjectName string = ""
+var ProjectType string = ""
+
 var commandCount int = 0
 var s *spinner.Spinner = spinner.New(spinner.CharSets[25], 100*time.Millisecond)
 
@@ -129,6 +130,33 @@ func main() {
 				Usage:   "Self Update Matrix CLI",
 				Action: func(cCtx *cli.Context) error {
 					update()
+
+					return nil
+				},
+			},
+			{
+				Name:  "analysis",
+				Usage: "Analysis of AWS instances",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "list",
+						Aliases: []string{"l", "ls"},
+						Usage:   "List AWS instances",
+					},
+					&cli.BoolFlag{
+						Name:    "spreadsheet",
+						Aliases: []string{"s"},
+						Usage:   "Create a spreadsheet of AWS instances",
+					},
+				},
+				Action: func(cCtx *cli.Context) error {
+					if cCtx.Bool("list") {
+						listAWSInstances()
+					}
+
+					if cCtx.Bool("spreadsheet") {
+						createSpreadsheetOfAWSInstances(cCtx)
+					}
 
 					return nil
 				},

@@ -11,21 +11,21 @@ func edit(cCtx *cli.Context) {
 	var shallowMode = cCtx.Bool("shallow")
 	var valetMode = cCtx.Bool("valet")
 
-	projectName = cCtx.Args().First()
+	ProjectName = cCtx.Args().First()
 
-	if projectName == "" {
+	if ProjectName == "" {
 		color.Red("× Error: Missing project name")
 		os.Exit(1)
 	}
 
-	if fileExists(projectName) {
+	if fileExists(ProjectName) {
 		color.Red("× Error: Project directory already exists")
 		os.Exit(2)
 	}
 
-	color.Magenta("Setting up existing project to edit: " + projectName)
+	color.Magenta("Setting up existing project to edit: " + ProjectName)
 
 	setupProject(false, shallowMode, valetMode)
 
-	color.Magenta("Project Ready! cd " + projectName)
+	color.Magenta("Project Ready! cd " + ProjectName)
 }
