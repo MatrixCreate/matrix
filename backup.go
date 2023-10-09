@@ -26,15 +26,15 @@ func backup(cCtx *cli.Context) {
 	color.Green("✓ MySQL is installed")
 
 	// Get project name
-	projectName = cCtx.Args().First()
-	if projectName == "" {
+	ProjectName = cCtx.Args().First()
+	if ProjectName == "" {
 		color.Red("× Error: Missing project name")
 		os.Exit(1)
 	}
 
 	// Check if project is craft
 	if fileExists("./craft") {
-		projectType = "craft"
+		ProjectType = "craft"
 
 		color.Green("✓ Craft Detected")
 
@@ -85,7 +85,7 @@ func backup(cCtx *cli.Context) {
 			"--skip-disable-keys",
 			"--skip-tz-utc",
 			"--skip-lock-tables",
-			"--result-file="+projectName+".sql",
+			"--result-file="+ProjectName+".sql",
 		)
 
 		color.White("Running: " + cmd.String())
@@ -102,7 +102,7 @@ func backup(cCtx *cli.Context) {
 
 	// Check if project is wordpress
 	if fileExists("./wp-content") {
-		projectType = "wordpress"
+		ProjectType = "wordpress"
 
 		color.White("✓ WordPress Detected")
 
@@ -111,13 +111,13 @@ func backup(cCtx *cli.Context) {
 		os.Exit(1)
 	}
 
-	var backupFileName = projectName + "-" + time.Now().Format("2006-01-02-15-04-05")
+	var backupFileName = ProjectName + "-" + time.Now().Format("2006-01-02-15-04-05")
 
-	runCommand(exec.Command("tar", "-czf", backupFileName+".sql.tar.gz", projectName+".sql"), false, false, false)
+	runCommand(exec.Command("tar", "-czf", backupFileName+".sql.tar.gz", ProjectName+".sql"), false, false, false)
 	runCommand(exec.Command("tar", "--warning=no-file-changed", "-czf", backupFileName+".tar.gz", "--exclude='web/cpresources'", "--exclude='storage/runtime'", "--exclude='vendor'", "--exclude='.git'", "--exclude='"+backupFileName+".tar.gz'", "."), false, false, false)
 
 	// Upload SQL backup to S3
-	cmd = exec.Command("aws", "s3", "cp", backupFileName+".sql.tar.gz", "s3://"+projectName+"/backups/"+backupFileName+".sql.tar.gz")
+	cmd = exec.Command("aws", "s3", "cp", backupFileName+".sql.tar.gz", "s3://"+ProjectName+"/backups/"+backupFileName+".sql.tar.gz")
 	color.White("Running: " + cmd.String())
 	err = cmd.Run()
 	if err != nil {
@@ -127,7 +127,7 @@ func backup(cCtx *cli.Context) {
 	}
 
 	// Upload Files backup to S3
-	cmd = exec.Command("aws", "s3", "cp", backupFileName+".tar.gz", "s3://"+projectName+"/backups/"+backupFileName+".tar.gz")
+	cmd = exec.Command("aws", "s3", "cp", backupFileName+".tar.gz", "s3://"+ProjectName+"/backups/"+backupFileName+".tar.gz")
 	color.White("Running: " + cmd.String())
 	err = cmd.Run()
 	if err != nil {
@@ -141,7 +141,7 @@ func backup(cCtx *cli.Context) {
 	// Delete local temp files
 	runCommand(exec.Command("rm", backupFileName+".sql.tar.gz"), false, false, true)
 	runCommand(exec.Command("rm", backupFileName+".tar.gz"), false, false, true)
-	runCommand(exec.Command("rm", projectName+".sql"), false, false, true)
+	runCommand(exec.Command("rm", ProjectName+".sql"), false, false, true)
 
 	color.Magenta("--------------------------------------------------")
 	color.Magenta("🎉            BACKUP COMPLETE                   🎉")

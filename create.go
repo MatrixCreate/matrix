@@ -10,21 +10,21 @@ import (
 func create(cCtx *cli.Context) {
 	var valetMode = cCtx.Bool("valet")
 
-	projectName = cCtx.Args().First()
+	ProjectName = cCtx.Args().First()
 
-	if projectName == "" {
+	if ProjectName == "" {
 		color.Red("× Error: Missing project name")
 		os.Exit(1)
 	}
 
-	if fileExists(projectName) {
+	if fileExists(ProjectName) {
 		color.Red("× Error: Project directory already exists")
 		os.Exit(2)
 	}
 
-	color.Magenta("Creating new Craft CMS project: " + projectName)
+	color.Magenta("Creating new Craft CMS project: " + ProjectName)
 
 	setupProject(true, false, valetMode)
 
-	color.Magenta("Project Ready! cd " + projectName)
+	color.Magenta("Project Ready! cd " + ProjectName)
 }

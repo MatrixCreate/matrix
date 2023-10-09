@@ -21,9 +21,9 @@ func deploy(cCtx *cli.Context) {
 	var profileName string = "matrix"
 
 	// Get project name
-	projectName = cCtx.Args().First()
+	ProjectName = cCtx.Args().First()
 
-	if projectName == "" {
+	if ProjectName == "" {
 		// Get project name from current directory
 		workingDir, err := os.Getwd()
 		if err != nil {
@@ -31,19 +31,19 @@ func deploy(cCtx *cli.Context) {
 			os.Exit(1)
 		}
 
-		projectName = strings.Split(workingDir, "/")[len(strings.Split(workingDir, "/"))-1]
+		ProjectName = strings.Split(workingDir, "/")[len(strings.Split(workingDir, "/"))-1]
 
-		color.White("Project Name: " + projectName)
+		color.White("Project Name: " + ProjectName)
 	}
 
 	// Check if project is craft
 	if fileExists("craft") {
-		projectType = "craft"
+		ProjectType = "craft"
 	}
 
 	// Check if project is wordpress
 	if fileExists("wp-content") {
-		projectType = "wordpress"
+		ProjectType = "wordpress"
 	}
 
 	// Get github token
@@ -105,7 +105,7 @@ func deploy(cCtx *cli.Context) {
 	// cd to /var/www/html
 	data += "cd /var/www/html\n"
 
-	// if projectType == "craft" {
+	// if ProjectType == "craft" {
 	// 	// Edit /opt/bitnami/apache/conf/bitnami/bitnami.conf and change /opt/bitnami/apache/htdocs to /opt/bitnami/apache/htdocs/web and save
 	// 	data += "sed -i 's|/opt/bitnami/apache/htdocs|/opt/bitnami/apache/htdocs/web|g' /opt/bitnami/apache2/conf/bitnami/bitnami.conf\n"
 
@@ -135,7 +135,7 @@ func deploy(cCtx *cli.Context) {
 	color.Green("✓ Completed: Writing to: deploy.sh")
 
 	// Run a EC2 instance using the git repo from the current directory
-	cmd = exec.Command("aws", "ec2", "run-instances", "--launch-template", "LaunchTemplateName="+launchTemplateName, "--instance-type", instanceType, "--user-data", "file://deploy.sh", "--tag-specifications", "ResourceType=instance,Tags=[{Key=Name,Value="+projectName+"}]", "--profile", profileName)
+	cmd = exec.Command("aws", "ec2", "run-instances", "--launch-template", "LaunchTemplateName="+launchTemplateName, "--instance-type", instanceType, "--user-data", "file://deploy.sh", "--tag-specifications", "ResourceType=instance,Tags=[{Key=Name,Value="+ProjectName+"}]", "--profile", profileName)
 	out, err = cmd.Output()
 	if err != nil {
 		color.Red("× Error Running: " + cmd.String())
@@ -203,7 +203,7 @@ func deploy(cCtx *cli.Context) {
 	color.Magenta("--------------------------------------------------")
 
 	// Get IP of the new instance as a var
-	cmd = exec.Command("aws", "ec2", "describe-instances", "--filters", "Name=tag:Name,Values="+projectName, "--profile", profileName)
+	cmd = exec.Command("aws", "ec2", "describe-instances", "--filters", "Name=tag:Name,Values="+ProjectName, "--profile", profileName)
 
 	out, err = cmd.Output()
 	if err != nil {
