@@ -36,6 +36,8 @@ Matrix CLI is a command line tool for managing Matrix projects.
 - `matrix delete {name}` - Delete a project
 - `matrix deploy` - Deploys the current project you are in to AWS Lightsail
 - `matrix backup` - Backups the current project you are in to AWS S3
+- `matrix analysis --list` - List all AWS instances
+- `matrix analysis --spreadsheet` - Create a spreadsheet of all AWS instances
 
 ## Installing ##
 
