@@ -4,7 +4,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 ## About ##
-Matrix CLI is a command line tool for managing Matrix projects.
+Matrix CLI is a command line tool for managing projects using DDEV, Github and AWS.
 
 ## Features ##
 - Create a new project
@@ -17,11 +17,8 @@ Matrix CLI is a command line tool for managing Matrix projects.
 
 ## Requirements ##
 - Go 1.16 or higher
-- AWS account
-- Github account
+- Github CLI
 - AWS CLI
-- AWS Lightsail
-- AWS S3
 - DDEV
 
 ## Commands ##
@@ -36,8 +33,9 @@ Matrix CLI is a command line tool for managing Matrix projects.
 - `matrix delete {name}` - Delete a project
 - `matrix deploy` - Deploys the current project you are in to AWS Lightsail
 - `matrix backup` - Backups the current project you are in to AWS S3
-- `matrix analysis --list` - List all AWS instances
-- `matrix analysis --spreadsheet` - Create a spreadsheet of all AWS instances
+- `matrix aws --list` - List all AWS instances
+- `matrix aws --spreadsheet` - Create a spreadsheet of all AWS instances
+- `matrix web` - Setup web server
 
 ## Installing ##
 

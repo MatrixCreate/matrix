@@ -11,9 +11,9 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-func listAWSInstances() {
-	var lightsailInstancesJSON map[string]interface{} = getAWSLightsailInstancesAsJSON()
-	var ec2InstancesJSON map[string]interface{} = getAWSEC2InstancesAsJSON()
+func listInstances() {
+	var lightsailInstancesJSON map[string]interface{} = getLightsailInstancesAsJSON()
+	var ec2InstancesJSON map[string]interface{} = getEC2InstancesAsJSON()
 
 	color.Magenta("EC2 Instances:")
 
@@ -53,12 +53,12 @@ func listAWSInstances() {
 	}
 }
 
-func createSpreadsheetOfAWSInstances(cCtx *cli.Context) {
+func createSpreadsheetOfInstances(cCtx *cli.Context) {
 	s.Suffix = " Creating spreadsheet of AWS instances..."
 	s.Start()
 
-	var lightsailInstancesJSON map[string]interface{} = getAWSLightsailInstancesAsJSON()
-	var ec2InstancesJSON map[string]interface{} = getAWSEC2InstancesAsJSON()
+	var lightsailInstancesJSON map[string]interface{} = getLightsailInstancesAsJSON()
+	var ec2InstancesJSON map[string]interface{} = getEC2InstancesAsJSON()
 
 	// Create a new spreadsheet
 	f := excelize.NewFile()
@@ -151,7 +151,7 @@ func createSpreadsheetOfAWSInstances(cCtx *cli.Context) {
 	color.Magenta("--------------------------------------------------")
 }
 
-func getAWSLightsailInstancesAsJSON() map[string]interface{} {
+func getLightsailInstancesAsJSON() map[string]interface{} {
 	// Run aws lightsail get-instances
 	cmd := exec.Command("aws", "lightsail", "get-instances", "--profile", "matrix")
 	out, err := cmd.Output()
@@ -175,7 +175,7 @@ func getAWSLightsailInstancesAsJSON() map[string]interface{} {
 	return lightsailInstancesJSON
 }
 
-func getAWSEC2InstancesAsJSON() map[string]interface{} {
+func getEC2InstancesAsJSON() map[string]interface{} {
 	// Run aws ec2 describe-instances
 	cmd := exec.Command("aws", "ec2", "describe-instances", "--profile", "matrix")
 	out, err := cmd.Output()

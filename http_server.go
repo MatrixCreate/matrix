@@ -32,8 +32,8 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 
-	var lightsailInstancesJSON map[string]interface{} = getAWSLightsailInstancesAsJSON()
-	var ec2InstancesJSON map[string]interface{} = getAWSEC2InstancesAsJSON()
+	var lightsailInstancesJSON map[string]interface{} = getLightsailInstancesAsJSON()
+	var ec2InstancesJSON map[string]interface{} = getEC2InstancesAsJSON()
 
 	data := Instances{}
 
