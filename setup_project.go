@@ -91,9 +91,9 @@ func setupProject(freshMode bool, shallowMode bool, valetMode bool) {
 			runCommand(exec.Command("ddev", "craft", "setup/db", "--interactive=0", "--driver=mysql", "--database=db", "--password=db", "--user=db", "--server=ddev-"+ProjectName+"-db", "--port=3306"), false, true, false)
 		}
 
-		// ddev import-db --src=_db/db.zip
+		// ddev import-db --file=_db/db.zip
 		if fileExists(ProjectName + "/_db/db.zip") {
-			runCommand(exec.Command("ddev", "import-db", "--src=_db/db.zip"), false, true, false)
+			runCommand(exec.Command("ddev", "import-db", "--file=_db/db.zip"), false, true, false)
 		} else {
 			color.Yellow("- No _db/db.zip file found. Skipping ddev import-db")
 		}
