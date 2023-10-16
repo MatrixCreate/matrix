@@ -10,6 +10,7 @@ import (
 )
 
 var CraftStarterRepo string = "git@github.com:MatrixCreate/craft-starter.git"
+var GithubRepoUser string = "matrixcreate"
 var ProjectName string = ""
 var ProjectType string = ""
 
@@ -59,13 +60,6 @@ func main() {
 				Name:    "create",
 				Aliases: []string{"c"},
 				Usage:   "Create a new Craft CMS project",
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:    "valet",
-						Aliases: []string{"v"},
-						Usage:   "Edit using Valet instead of DDEV",
-					},
-				},
 				Action: func(cCtx *cli.Context) error {
 					create(cCtx)
 
@@ -81,11 +75,6 @@ func main() {
 						Name:    "shallow",
 						Aliases: []string{"s"},
 						Usage:   "Edit in shallow mode which provides a low depth git clone with all branches",
-					},
-					&cli.BoolFlag{
-						Name:    "valet",
-						Aliases: []string{"v"},
-						Usage:   "Edit using Valet instead of DDEV",
 					},
 				},
 				Action: func(cCtx *cli.Context) error {
