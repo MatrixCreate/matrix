@@ -38,7 +38,9 @@ func setupProject(freshMode bool, shallowMode bool) {
 	}
 
 	// ddev start
-	runCommand(exec.Command("ddev", "start"), false, true, true)
+	if fileExists(ProjectName + "/.ddev") {
+		runCommand(exec.Command("ddev", "start"), false, true, true)
+	}
 
 	// ddev composer install
 	if fileExists(ProjectName + "/composer.lock") {
@@ -50,7 +52,7 @@ func setupProject(freshMode bool, shallowMode bool) {
 	// ddev npm install
 	if fileExists(ProjectName + "/package-lock.json") {
 		// For Laravel we run npm locally
-		if fileExists(ProjectName + "/artisan") {
+		if fileExists(ProjectName+"/artisan") || !fileExists(ProjectName+"/.ddev") {
 			runCommand(exec.Command("npm", "install"), false, true, false)
 		} else {
 			runCommand(exec.Command("ddev", "npm", "install"), false, true, false)
