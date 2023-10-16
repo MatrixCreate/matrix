@@ -124,8 +124,8 @@ func main() {
 				},
 			},
 			{
-				Name:  "analysis",
-				Usage: "Analysis of AWS instances",
+				Name:  "aws",
+				Usage: "AWS Helper Commands",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
 						Name:    "list",
@@ -140,11 +140,11 @@ func main() {
 				},
 				Action: func(cCtx *cli.Context) error {
 					if cCtx.Bool("list") {
-						listAWSInstances()
+						listInstances()
 					}
 
 					if cCtx.Bool("spreadsheet") {
-						createSpreadsheetOfAWSInstances(cCtx)
+						createSpreadsheetOfInstances(cCtx)
 					}
 
 					return nil
