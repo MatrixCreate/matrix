@@ -8,8 +8,6 @@ import (
 )
 
 func create(cCtx *cli.Context) {
-	var valetMode = cCtx.Bool("valet")
-
 	ProjectName = cCtx.Args().First()
 
 	if ProjectName == "" {
@@ -24,7 +22,7 @@ func create(cCtx *cli.Context) {
 
 	color.Magenta("Creating new Craft CMS project: " + ProjectName)
 
-	setupProject(true, false, valetMode)
+	setupProject(true, false)
 
 	color.Magenta("Project Ready! cd " + ProjectName)
 }

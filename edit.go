@@ -9,7 +9,6 @@ import (
 
 func edit(cCtx *cli.Context) {
 	var shallowMode = cCtx.Bool("shallow")
-	var valetMode = cCtx.Bool("valet")
 
 	ProjectName = cCtx.Args().First()
 
@@ -25,7 +24,7 @@ func edit(cCtx *cli.Context) {
 
 	color.Magenta("Setting up existing project to edit: " + ProjectName)
 
-	setupProject(false, shallowMode, valetMode)
+	setupProject(false, shallowMode)
 
 	color.Magenta("Project Ready! cd " + ProjectName)
 }
