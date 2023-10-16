@@ -52,7 +52,7 @@ func setupProject(freshMode bool, shallowMode bool, valetMode bool) {
 			runCommand(exec.Command("php", "craft", "setup/db", "--interactive=0", "--driver=mysql", "--database=db", "--password=db", "--user=db", "--server=ddev-"+ProjectName+"-db", "--port=3306"), false, true, false)
 		}
 
-		// ddev import-db --src=_db/db.zip
+		// ddev import-db --file=_db/db.zip
 		// TODO: Add Valet version for DB settings using DBngin
 
 		if freshMode {
