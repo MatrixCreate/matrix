@@ -161,6 +161,28 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:  "web",
+				Usage: "Start Web Server",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "port",
+						Aliases: []string{"p"},
+						Usage:   "Port to run web server on",
+					},
+				},
+				Action: func(cCtx *cli.Context) error {
+					port := "8080"
+
+					if cCtx.Bool("port") {
+						port = cCtx.String("port")
+					}
+
+					initHttpServer(port)
+
+					return nil
+				},
+			},
 		},
 	}
 
